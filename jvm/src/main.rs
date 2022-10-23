@@ -1,29 +1,9 @@
 use jvm_parser::{
-    self, read_u1, read_u2, AttributeInfo, AttributeInfoTypes, ClassFile, CpInfo,
-    Methods_MethodInfo,
+    self,
+    content_pool::CpInfo,
+    utils::{read_u1, read_u2},
+    ClassFile,
 };
-
-fn find_function_by_name(class_file: &ClassFile, name: String) -> Option<&Methods_MethodInfo> {
-    class_file.methods.iter().find(|v| {
-        match class_file.constant_pool[v.name_index as usize - 1].clone() {
-            CpInfo::Utf8(utf8) => utf8.data == name,
-            _ => false,
-        }
-    })
-}
-
-fn find_attributes_by_name<'a>(
-    class_file: &'a ClassFile,
-    attributes: &'a Vec<AttributeInfo>,
-    name: String,
-) -> Option<&'a AttributeInfo> {
-    attributes.iter().find(|v| {
-        match class_file.constant_pool[v.attribute_name_index as usize - 1].clone() {
-            CpInfo::Utf8(utf8) => utf8.data == name,
-            _ => false,
-        }
-    })
-}
 
 #[allow(non_camel_case_types)]
 #[derive(Debug)]
@@ -68,8 +48,6 @@ struct StackObjectRef {
 }
 
 fn execute_code(class_file: &ClassFile, code: Vec<u8>) {
-    println!("{:?}", code);
-
     let mut bytes = code;
 
     let mut stack: Vec<StackValue> = vec![];
@@ -133,11 +111,11 @@ fn execute_code(class_file: &ClassFile, code: Vec<u8>) {
                     .unwrap();
 
                 let name_type_name = class_file.get_utf8_from_pool(name_type.name_index).unwrap();
-                let descriptor = class_file
-                    .get_utf8_from_pool(name_type.descriptor_index)
-                    .unwrap();
+                // let descriptor = class_file
+                //     .get_utf8_from_pool(name_type.descriptor_index)
+                //     .unwrap();
 
-                if let StackValue::ObjectRef(obj_ref) = stack.drain(0..1).next().unwrap() {}
+                if let StackValue::ObjectRef(_) = stack.drain(0..1).next().unwrap() {}
 
                 if class_name.data == "java/io/PrintStream" {
                     match name_type_name.data.as_str() {
@@ -184,6 +162,7 @@ fn execute_code(class_file: &ClassFile, code: Vec<u8>) {
                     opcode
                 );
             }
+            #[allow(unreachable_patterns)]
             unknown_opcode => {
                 panic!("The OpCode( {} : {:?} )", opcode, unknown_opcode)
             }
@@ -195,25 +174,8 @@ fn main() {
     let class_file: ClassFile =
         jvm_parser::parse_java_class_file("./java/MyProgram.class".into()).unwrap();
 
-    if let Some(main_method) = find_function_by_name(&class_file, "main".to_string()) {
-        // println!("{:#?}", main_method);
-        if let Some(code) =
-            find_attributes_by_name(&class_file, &main_method.attributes, "Code".to_string())
-        {
-            match &code.attibutes {
-                AttributeInfoTypes::Code {
-                    max_stack: _,
-                    max_locals: _,
-                    code_length: _,
-                    code,
-                    exception_table_length: _,
-                    exception_table: _,
-                    attributes_count: _,
-                    attribute_info: _,
-                } => execute_code(&class_file, code.clone()),
-                _ => {}
-            }
-        }
+    if let Some((_, code)) = class_file.get_main_method() {
+        execute_code(&class_file, code)
     }
 
     println!("Hello, world, from Rust!");

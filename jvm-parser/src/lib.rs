@@ -1,4 +1,14 @@
+pub mod attributes;
+pub mod content_pool;
+pub mod utils;
+
+use attributes::{
+    AttributeInfo, AttributeInfoData, CodeAttribute, ExceptionTable, LineNumber,
+    LineNumberTableAttribute, SourceFileAttribute,
+};
+use content_pool::{CpInfo, CpInfoClass, CpInfoNameAndType, CpInfoRefs, CpInfoString, CpInfoUtf8};
 use std::{error::Error, path::PathBuf};
+use utils::{read_bytes, read_u1, read_u2, read_u4};
 
 // From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.1
 #[derive(Debug, Default)]
@@ -16,7 +26,7 @@ pub struct ClassFile {
     pub fields_count: u16,
     pub fields: Vec<FieldInfo>,
     pub methods_count: u16,
-    pub methods: Vec<Methods_MethodInfo>,
+    pub methods: Vec<MethodInfo>,
     pub attributes_count: u16,
     pub attributes: Vec<AttributeInfo>,
 }
@@ -107,7 +117,7 @@ impl ClassFile {
                     todo!("Unknown CONSTANT_TYPE: {}", unknown_tag)
                 }
             };
-            println!("cp_info = {:?}", cp_info);
+            // println!("cp_info = {:?}", cp_info);
             pool.push(cp_info);
         }
         pool
@@ -117,7 +127,7 @@ impl ClassFile {
         bytes: &mut Vec<u8>,
         method_count: &u16,
         constant_pool: &Vec<CpInfo>,
-    ) -> Vec<Methods_MethodInfo> {
+    ) -> Vec<MethodInfo> {
         let mut methods = vec![];
 
         for _ in 0..*method_count as usize {
@@ -128,7 +138,7 @@ impl ClassFile {
                     0x0800, 0x1000,
                 ],
             );
-            let mut method = Methods_MethodInfo {
+            let mut method = MethodInfo {
                 access_flags: AccessFlags {
                     byte_flags: valid_masks.clone(),
                     flags: vec![
@@ -171,24 +181,21 @@ impl ClassFile {
         let mut attributes = vec![];
 
         for _ in 0..attribute_count.to_owned() as usize {
-            let attrib_name_index = read_u2(bytes);
-            let attrib_length = read_u4(bytes);
+            let attribute_name_index = read_u2(bytes);
+            let _ = read_u4(bytes);
 
-            let pool_entry = constant_pool
-                .get(attrib_name_index as usize - 1)
-                .expect("Failed to parse methods, index out of CONSTANT Pool bounds");
-
-            let attribute_type = match pool_entry {
-                CpInfo::Utf8(utf8_data) => match utf8_data.data.as_str() {
+            if let CpInfo::Utf8(utf8) = &constant_pool[attribute_name_index as usize - 1] {
+                let attribute = match utf8.data.as_str() {
                     "Code" => {
                         let max_stack = read_u2(bytes);
                         let max_locals = read_u2(bytes);
                         let code_length = read_u4(bytes);
-                        let code = bytes.drain(0..code_length as usize).collect();
+                        let code = read_bytes(bytes, code_length as usize);
                         let exception_table_length = read_u2(bytes);
 
                         let mut exception_table = vec![];
-                        for _ in 0..exception_table_length {
+
+                        for _ in 0..exception_table_length as usize {
                             exception_table.push(ExceptionTable {
                                 start_pc: read_u2(bytes),
                                 end_pc: read_u2(bytes),
@@ -197,19 +204,17 @@ impl ClassFile {
                             });
                         }
 
-                        let attributes_count = read_u2(bytes);
+                        let attribute_count = read_u2(bytes);
                         let attribute_info =
-                            ClassFile::parse_attributes(bytes, attribute_count, constant_pool);
-                        AttributeInfoTypes::Code {
+                            ClassFile::parse_attributes(bytes, &attribute_count, constant_pool);
+
+                        AttributeInfoData::Code(CodeAttribute {
                             max_stack,
                             max_locals,
-                            code_length,
                             code,
-                            exception_table_length,
                             exception_table,
-                            attributes_count,
                             attribute_info,
-                        }
+                        })
                     }
 
                     "LineNumberTable" => {
@@ -223,15 +228,14 @@ impl ClassFile {
                             })
                         }
 
-                        AttributeInfoTypes::LineNumberTable {
-                            line_number_table_length,
+                        AttributeInfoData::LineNumberTable(LineNumberTableAttribute {
                             line_number_table,
-                        }
+                        })
                     }
 
-                    "SourceFile" => AttributeInfoTypes::SourceFile {
+                    "SourceFile" => AttributeInfoData::SourceFile(SourceFileAttribute {
                         sourcefile_index: read_u2(bytes),
-                    },
+                    }),
 
                     not_implemented_type => {
                         todo!(
@@ -239,18 +243,12 @@ impl ClassFile {
                             not_implemented_type
                         )
                     }
-                },
-
-                wrong_type => {
-                    panic!("(Method Parsing) The pool entry at ATTRIBUTE_NAME_INDEX should be CONSTANT_Utf8, not {:#?}", wrong_type)
-                }
-            };
-
-            attributes.push(AttributeInfo {
-                attribute_name_index: attrib_name_index,
-                attribute_length: attrib_length,
-                attibutes: attribute_type,
-            })
+                };
+                attributes.push(AttributeInfo {
+                    attribute_name_index,
+                    attribute,
+                });
+            }
         }
 
         attributes
@@ -308,6 +306,34 @@ impl ClassFile {
 
         return None;
     }
+
+    pub fn get_main_method(&self) -> Option<(&MethodInfo, Vec<u8>)> {
+        if let Some(method) = self.methods.iter().find(|&v| {
+            if let Some(name) = &self.get_utf8_from_pool(v.name_index) {
+                if name.data.as_str() == "main" {
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }) {
+            let mut code_bytes: Option<Vec<u8>> = None;
+
+            for attribute in method.attributes.iter() {
+                if let AttributeInfoData::Code(data) = &attribute.attribute {
+                    code_bytes = Some(data.code.clone())
+                }
+            }
+
+            let code_bytes = code_bytes.unwrap();
+
+            return Some((method, code_bytes));
+        }
+
+        None
+    }
 }
 
 #[derive(Debug, Default)]
@@ -317,7 +343,7 @@ pub struct AccessFlags {
 }
 
 #[derive(Debug, Default)]
-pub struct Methods_MethodInfo {
+pub struct MethodInfo {
     pub access_flags: AccessFlags,
     pub name_index: u16,
     pub descriptor_index: u16,
@@ -335,49 +361,6 @@ fn parse_flags(value: u16, masks: Vec<u16>) -> Vec<u16> {
     valid_masks
 }
 
-// From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4
-#[derive(Debug, Default, Clone)]
-pub enum CpInfo {
-    #[default]
-    None,
-
-    Class(CpInfoClass),
-    Refs(CpInfoRefs),
-    NameAndType(CpInfoNameAndType),
-    Utf8(CpInfoUtf8),
-    String(CpInfoString),
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct CpInfoClass {
-    pub tag: String,
-    pub name_index: u16,
-}
-#[derive(Debug, Default, Clone)]
-pub struct CpInfoRefs {
-    pub tag: String,
-    pub class_index: u16,
-    pub name_and_type_index: u16,
-}
-#[derive(Debug, Default, Clone)]
-pub struct CpInfoNameAndType {
-    pub tag: String,
-    pub name_index: u16,
-    pub descriptor_index: u16,
-}
-#[derive(Debug, Default, Clone)]
-pub struct CpInfoUtf8 {
-    pub tag: String,
-    pub length: u16,
-    pub bytes: Vec<u8>,
-    pub data: String,
-}
-#[derive(Debug, Default, Clone)]
-pub struct CpInfoString {
-    pub tag: String,
-    pub string_index: u16,
-}
-
 #[derive(Debug, Default)]
 pub enum Interfaces {
     #[default]
@@ -388,105 +371,9 @@ pub enum FieldInfo {
     #[default]
     V,
 }
-#[derive(Debug, Default)]
-pub enum MethodInfo {
-    #[default]
-    V,
-}
-
-#[derive(Debug, Default)]
-pub struct AttributeInfo {
-    pub attribute_name_index: u16,
-    pub attribute_length: u32,
-    pub attibutes: AttributeInfoTypes,
-}
-
-#[derive(Debug, Default)]
-pub enum AttributeInfoTypes {
-    #[default]
-    None,
-
-    Code {
-        max_stack: u16,
-        max_locals: u16,
-        code_length: u32,
-        code: Vec<u8>,
-        exception_table_length: u16,
-        exception_table: Vec<ExceptionTable>,
-        attributes_count: u16,
-        attribute_info: Vec<AttributeInfo>,
-    },
-
-    LineNumberTable {
-        line_number_table_length: u16,
-        line_number_table: Vec<LineNumber>,
-    },
-
-    SourceFile {
-        sourcefile_index: u16,
-    },
-}
-
-#[derive(Debug, Default)]
-pub struct LineNumber {
-    pub start_pc: u16,
-    pub line_number: u16,
-}
-
-#[derive(Debug, Default)]
-pub struct ExceptionTable {
-    pub start_pc: u16,
-    pub end_pc: u16,
-    pub handler_pc: u16,
-    pub catch_type: u16,
-}
 
 pub fn parse_java_class_file(path: PathBuf) -> Result<ClassFile, Box<dyn Error>> {
     parse_java_class(std::fs::read(path)?)
-}
-
-pub fn read_u4(bytes: &mut Vec<u8>) -> u32 {
-    let mut read_bytes: [u8; 4] = Default::default();
-
-    bytes.drain(0..4).enumerate().for_each(|(i, byte)| {
-        read_bytes[i] = byte;
-    });
-    u32::from_be_bytes(read_bytes)
-}
-
-fn get_u4(bytes: &Vec<u8>) -> u32 {
-    let mut read_bytes: [u8; 4] = Default::default();
-    bytes
-        .get(0..4)
-        .unwrap()
-        .iter()
-        .enumerate()
-        .for_each(|(i, byte)| read_bytes[i] = byte.clone());
-    u32::from_be_bytes(read_bytes)
-}
-
-pub fn read_u2(bytes: &mut Vec<u8>) -> u16 {
-    let mut read_bytes: [u8; 2] = Default::default();
-
-    bytes.drain(0..2).enumerate().for_each(|(i, byte)| {
-        read_bytes[i] = byte;
-    });
-    u16::from_be_bytes(read_bytes)
-}
-
-fn get_u2(bytes: &Vec<u8>) -> u16 {
-    let mut read_bytes: [u8; 2] = Default::default();
-    bytes
-        .get(0..2)
-        .unwrap()
-        .iter()
-        .enumerate()
-        .for_each(|(i, byte)| read_bytes[i] = byte.clone());
-    u16::from_be_bytes(read_bytes)
-}
-
-pub fn read_u1(bytes: &mut Vec<u8>) -> u8 {
-    bytes.remove(0)
 }
 
 pub fn parse_java_class(mut bytes: Vec<u8>) -> Result<ClassFile, Box<dyn Error>> {
