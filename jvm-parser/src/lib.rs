@@ -6,9 +6,9 @@ use attributes::{
     AttributeInfo, AttributeInfoData, CodeAttribute, ExceptionTable, LineNumber,
     LineNumberTableAttribute, SourceFileAttribute,
 };
-use content_pool::{CpInfo, CpInfoClass, CpInfoNameAndType, CpInfoRefs, CpInfoString, CpInfoUtf8};
+use content_pool::{ConstantPool, CpInfo};
 use std::{error::Error, path::PathBuf};
-use utils::{read_bytes, read_u1, read_u2, read_u4};
+use utils::{read_bytes, read_u2, read_u4};
 
 // From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.1
 #[derive(Debug, Default)]
@@ -16,111 +16,79 @@ pub struct ClassFile {
     pub magic: u32,
     pub minor_version: u16,
     pub major_version: u16,
-    pub constant_pool_count: u16,
-    pub constant_pool: Vec<CpInfo>,
+    pub constant_pool: ConstantPool,
     pub access_flags: AccessFlags,
     pub this_class: u16,
     pub super_class: u16,
-    pub interfaces_count: u16,
     pub interfaces: Vec<Interfaces>,
-    pub fields_count: u16,
     pub fields: Vec<FieldInfo>,
-    pub methods_count: u16,
     pub methods: Vec<MethodInfo>,
-    pub attributes_count: u16,
     pub attributes: Vec<AttributeInfo>,
 }
 
 impl ClassFile {
-    pub fn parse_constant_pool(mut bytes: &mut Vec<u8>, pool_count: &u16) -> Vec<CpInfo> {
-        let mut pool = vec![];
+    pub fn from_file(path: PathBuf) -> Result<ClassFile, Box<dyn Error>> {
+        ClassFile::from_bytes(std::fs::read(path)?)
+    }
+    pub fn from_bytes(mut bytes: Vec<u8>) -> Result<ClassFile, Box<dyn Error>> {
+        let mut class_file = ClassFile {
+            magic: read_u4(&mut bytes),
+            minor_version: read_u2(&mut bytes),
+            major_version: read_u2(&mut bytes),
+            ..Default::default()
+        };
 
-        for _ in 0..(pool_count - 1) {
-            let cp_info = match read_u1(&mut bytes) {
-                7 => CpInfo::Class(CpInfoClass {
-                    tag: "CONSTANT_Class".to_string(),
-                    name_index: read_u2(&mut bytes),
-                }),
+        // Read Constant Pool
+        let constant_pool_count = read_u2(&mut bytes);
+        class_file.constant_pool = ConstantPool::from_bytes(&mut bytes, &constant_pool_count);
 
-                9 => CpInfo::Refs(CpInfoRefs {
-                    tag: "CONSTANT_FieldRef".to_string(),
-                    class_index: read_u2(bytes),
-                    name_and_type_index: read_u2(bytes),
-                }),
+        // class_file.access_flags =
+        let valid_masks = parse_flags(
+            read_u2(&mut bytes),
+            vec![
+                0x001, 0x0010, 0x0020, 0x0200, 0x0400, 0x1000, 0x2000, 0x4000,
+            ],
+        );
 
-                10 => CpInfo::Refs(CpInfoRefs {
-                    tag: "CONSTANT_MethodRef".to_string(),
-                    class_index: read_u2(bytes),
-                    name_and_type_index: read_u2(bytes),
-                }),
+        class_file.access_flags = AccessFlags {
+            byte_flags: valid_masks.clone(),
+            flags: vec![
+                ("ACC_PUBLIC".to_string(), 0x0001),
+                ("ACC_FINAL".to_string(), 0x0010),
+                ("ACC_SUPER".to_string(), 0x0020),
+                ("ACC_INTERFACE".to_string(), 0x0200),
+                ("ACC_ABSTRACT".to_string(), 0x0400),
+                ("ACC_SYNTHETIC".to_string(), 0x1000),
+                ("ACC_ANNOTATION".to_string(), 0x2000),
+                ("ACC_ENUM".to_string(), 0x4000),
+            ]
+            .iter()
+            .filter(|flag| valid_masks.contains(&flag.1))
+            .map(|flag| flag.0.clone())
+            .collect::<Vec<String>>(),
+        };
 
-                11 => CpInfo::Refs(CpInfoRefs {
-                    tag: "CONSTANT_InterfaceMethodref".to_string(),
-                    class_index: read_u2(bytes),
-                    name_and_type_index: read_u2(bytes),
-                }),
+        class_file.this_class = read_u2(&mut bytes);
+        class_file.super_class = read_u2(&mut bytes);
 
-                8 => CpInfo::String(CpInfoString {
-                    tag: "CONSTANT_String".to_string(),
-                    string_index: read_u2(bytes),
-                }),
+        #[allow(unused_variables)] // TODO: Remove this when implemented
+        let interfaces_count = read_u2(&mut bytes);
 
-                3 => {
-                    todo!("CONSTANT_Integer not implemented")
-                }
+        class_file.interfaces = vec![]; // TODO: implement interface parsing
 
-                4 => {
-                    todo!("CONSTANT_Float not implemented")
-                }
+        #[allow(unused_variables)] // TODO: Remove this when implemented
+        let fields_count = read_u2(&mut bytes);
+        class_file.fields = vec![]; // TODO: implement field parsing
 
-                5 => {
-                    todo!("CONSTANT_Long not implemented")
-                }
+        let methods_count = read_u2(&mut bytes);
+        class_file.methods =
+            ClassFile::parse_methods(&mut bytes, &methods_count, &class_file.constant_pool.0);
 
-                6 => {
-                    todo!("CONSTANT_Double not implemented")
-                }
+        let attributes_count = read_u2(&mut bytes);
+        class_file.attributes =
+            ClassFile::parse_attributes(&mut bytes, &attributes_count, &class_file.constant_pool.0);
 
-                12 => CpInfo::NameAndType(CpInfoNameAndType {
-                    tag: "CONSTANT_NameAndType".to_string(),
-                    name_index: read_u2(bytes),
-                    descriptor_index: read_u2(bytes),
-                }),
-
-                1 => {
-                    let length = read_u2(bytes);
-
-                    let utf8_bytes = bytes.drain(0..(length as usize)).collect::<Vec<u8>>();
-                    let text = String::from_utf8(utf8_bytes.clone()).unwrap();
-
-                    CpInfo::Utf8(CpInfoUtf8 {
-                        tag: "CONSTANT_Utf8".to_string(),
-                        length: length,
-                        bytes: utf8_bytes,
-                        data: text,
-                    })
-                }
-
-                15 => {
-                    todo!("CONSTANT_MethodHandle not implemented")
-                }
-
-                16 => {
-                    todo!("CONSTANT_MethodType not implemented")
-                }
-
-                18 => {
-                    todo!("CONSTANT_InvokeDynamic not implemented")
-                }
-
-                unknown_tag => {
-                    todo!("Unknown CONSTANT_TYPE: {}", unknown_tag)
-                }
-            };
-            // println!("cp_info = {:?}", cp_info);
-            pool.push(cp_info);
-        }
-        pool
+        Ok(class_file)
     }
 
     pub fn parse_methods(
@@ -256,60 +224,9 @@ impl ClassFile {
 }
 
 impl ClassFile {
-    pub fn get_class_from_pool(&self, index: u16) -> Option<&CpInfoClass> {
-        if let CpInfo::Class(class) = &self.constant_pool[index as usize - 1] {
-            return Some(class);
-        }
-        None
-    }
-
-    pub fn get_refs_from_pool(&self, index: u16) -> Option<&CpInfoRefs> {
-        if let CpInfo::Refs(refs) = &self.constant_pool[index as usize - 1] {
-            return Some(refs);
-        }
-        None
-    }
-
-    pub fn get_name_and_type_from_pool(&self, index: u16) -> Option<&CpInfoNameAndType> {
-        if let CpInfo::NameAndType(name_type) = &self.constant_pool[index as usize - 1] {
-            return Some(name_type);
-        }
-        None
-    }
-
-    pub fn get_utf8_from_pool(&self, index: u16) -> Option<&CpInfoUtf8> {
-        if let CpInfo::Utf8(utf8) = &self.constant_pool[index as usize - 1] {
-            return Some(utf8);
-        }
-        None
-    }
-
-    pub fn get_string_from_pool(&self, index: u16) -> Option<&CpInfoString> {
-        if let CpInfo::String(str) = &self.constant_pool[index as usize - 1] {
-            return Some(str);
-        }
-        None
-    }
-
-    pub fn get_refs_from_pool_ext(
-        &self,
-        index: u16,
-    ) -> Option<(&CpInfoRefs, &CpInfoClass, &CpInfoNameAndType)> {
-        if let Some(refs) = self.get_refs_from_pool(index) {
-            if let Some(class) = self.get_class_from_pool(refs.class_index) {
-                if let Some(name_type) = self.get_name_and_type_from_pool(refs.name_and_type_index)
-                {
-                    return Some((refs, class, name_type));
-                }
-            }
-        }
-
-        return None;
-    }
-
     pub fn get_main_method(&self) -> Option<(&MethodInfo, Vec<u8>)> {
         if let Some(method) = self.methods.iter().find(|&v| {
-            if let Some(name) = &self.get_utf8_from_pool(v.name_index) {
+            if let Some(name) = &self.constant_pool.get_utf8_at(v.name_index) {
                 if name.data.as_str() == "main" {
                     true
                 } else {
@@ -370,73 +287,4 @@ pub enum Interfaces {
 pub enum FieldInfo {
     #[default]
     V,
-}
-
-pub fn parse_java_class_file(path: PathBuf) -> Result<ClassFile, Box<dyn Error>> {
-    parse_java_class(std::fs::read(path)?)
-}
-
-pub fn parse_java_class(mut bytes: Vec<u8>) -> Result<ClassFile, Box<dyn Error>> {
-    let mut class_file = ClassFile {
-        magic: read_u4(&mut bytes),
-        minor_version: read_u2(&mut bytes),
-        major_version: read_u2(&mut bytes),
-        ..Default::default()
-    };
-
-    // Read Constant Pool
-    class_file.constant_pool_count = read_u2(&mut bytes);
-    class_file.constant_pool =
-        ClassFile::parse_constant_pool(&mut bytes, &class_file.constant_pool_count);
-
-    // class_file.access_flags =
-    let valid_masks = parse_flags(
-        read_u2(&mut bytes),
-        vec![
-            0x001, 0x0010, 0x0020, 0x0200, 0x0400, 0x1000, 0x2000, 0x4000,
-        ],
-    );
-
-    class_file.access_flags = AccessFlags {
-        byte_flags: valid_masks.clone(),
-        flags: vec![
-            ("ACC_PUBLIC".to_string(), 0x0001),
-            ("ACC_FINAL".to_string(), 0x0010),
-            ("ACC_SUPER".to_string(), 0x0020),
-            ("ACC_INTERFACE".to_string(), 0x0200),
-            ("ACC_ABSTRACT".to_string(), 0x0400),
-            ("ACC_SYNTHETIC".to_string(), 0x1000),
-            ("ACC_ANNOTATION".to_string(), 0x2000),
-            ("ACC_ENUM".to_string(), 0x4000),
-        ]
-        .iter()
-        .filter(|flag| valid_masks.contains(&flag.1))
-        .map(|flag| flag.0.clone())
-        .collect::<Vec<String>>(),
-    };
-
-    class_file.this_class = read_u2(&mut bytes);
-    class_file.super_class = read_u2(&mut bytes);
-    class_file.interfaces_count = read_u2(&mut bytes);
-
-    class_file.interfaces = vec![]; // TODO: implement interface parsing
-
-    class_file.fields_count = read_u2(&mut bytes);
-    class_file.fields = vec![]; // TODO: implement field parsing
-
-    class_file.methods_count = read_u2(&mut bytes);
-    class_file.methods = ClassFile::parse_methods(
-        &mut bytes,
-        &class_file.methods_count,
-        &class_file.constant_pool,
-    );
-
-    class_file.attributes_count = read_u2(&mut bytes);
-    class_file.attributes = ClassFile::parse_attributes(
-        &mut bytes,
-        &class_file.attributes_count,
-        &class_file.constant_pool,
-    );
-
-    Ok(class_file)
 }
