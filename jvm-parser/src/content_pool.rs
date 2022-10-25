@@ -1,4 +1,4 @@
-use crate::utils::{read_u1, read_u2, read_u4};
+use crate::utils::{read_bytes, read_u1, read_u2, read_u4};
 
 #[derive(Debug, Default)]
 pub struct ConstantPool(pub Vec<CpInfo>);
@@ -37,10 +37,22 @@ impl ConstantPool {
                     string_index: read_u2(bytes),
                 }),
 
-                3 => CpInfo::Integrer(CpInfoInteger {
-                    tag: "CONSTANT_Integer".to_string(),
-                    bytes: read_u4(bytes),
-                }),
+                3 => {
+                    let bytes = read_bytes(bytes, 4);
+
+                    let mut byte_array: [u8; 4] = Default::default();
+
+                    bytes
+                        .iter()
+                        .enumerate()
+                        .for_each(|(i, byte)| byte_array[i] = byte.clone());
+
+                    println!("{:?}", byte_array);
+                    CpInfo::Integrer(CpInfoInteger {
+                        tag: "CONSTANT_Integer".to_string(),
+                        bytes: i32::from_be_bytes(byte_array),
+                    })
+                }
 
                 4 => CpInfo::Float(CpInfoFloat {
                     tag: "CONSTANT_Float".to_string(),
@@ -185,7 +197,7 @@ pub enum CpInfo {
 #[derive(Debug, Default, Clone)]
 pub struct CpInfoInteger {
     pub tag: String,
-    pub bytes: u32,
+    pub bytes: i32,
 }
 #[derive(Debug, Default, Clone)]
 pub struct CpInfoFloat {
