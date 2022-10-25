@@ -2,18 +2,21 @@ public class MyProgram {
 	public static void main(String[] args) {
 
 		int x = 10;
-		System.out.println(x);
-		// float pi = 3.14f;
+		float pi = 3.14f;
 		// long somethingBig = Long.MAX_VALUE;
 		// double somethingPrecise = Double.MIN_VALUE;
 
 
-		// System.out.print("x = ");
-		// System.out.println(x);
+		System.out.print("x = ");
+		System.out.println(x);
 
-		// System.out.print("pi = ");
-		// System.out.println(pi);
-		
+		System.out.print("pi = ");
+		System.out.println(pi);
+
+		System.out.println(6.28f);
+		System.out.println(-10);
+
+
 		// System.out.print("somethingBig = ");
 		// System.out.println(somethingBig);
 		
