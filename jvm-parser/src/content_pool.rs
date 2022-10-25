@@ -1,4 +1,4 @@
-use crate::utils::{read_u1, read_u2};
+use crate::utils::{read_u1, read_u2, read_u4};
 
 #[derive(Debug, Default)]
 pub struct ConstantPool(pub Vec<CpInfo>);
@@ -37,20 +37,40 @@ impl ConstantPool {
                     string_index: read_u2(bytes),
                 }),
 
-                3 => {
-                    todo!("CONSTANT_Integer not implemented")
-                }
+                3 => CpInfo::Integrer(CpInfoInteger {
+                    tag: "CONSTANT_Integer".to_string(),
+                    bytes: read_u4(bytes),
+                }),
 
-                4 => {
-                    todo!("CONSTANT_Float not implemented")
-                }
+                4 => CpInfo::Float(CpInfoFloat {
+                    tag: "CONSTANT_Float".to_string(),
+                    bytes: f32::from_bits(read_u4(bytes)),
+                }),
 
                 5 => {
-                    todo!("CONSTANT_Long not implemented")
+                    let high = read_u4(bytes);
+                    let low = read_u4(bytes);
+                    let bytes: u64 = ((high as u64) << 32) + low as u64;
+
+                    CpInfo::Long(CpInfoLong {
+                        tag: "CONSTANT_Long".to_string(),
+                        high_bytes: high,
+                        low_bytes: low,
+                        bytes: bytes,
+                    })
                 }
 
                 6 => {
-                    todo!("CONSTANT_Double not implemented")
+                    let high = read_u4(bytes);
+                    let low = read_u4(bytes);
+                    let bytes: u64 = ((high as u64) << 32) + low as u64;
+                    let bytes = f64::from_bits(bytes);
+                    CpInfo::Double(CpInfoDouble {
+                        tag: "CONSTANT_Double".to_string(),
+                        high_bytes: high,
+                        low_bytes: low,
+                        bytes: bytes,
+                    })
                 }
 
                 12 => CpInfo::NameAndType(CpInfoNameAndType {
@@ -84,7 +104,6 @@ impl ConstantPool {
                 18 => {
                     todo!("CONSTANT_InvokeDynamic not implemented")
                 }
-
                 unknown_tag => {
                     panic!("Unknown CONSTANT_TYPE: {}", unknown_tag)
                 }
@@ -157,6 +176,36 @@ pub enum CpInfo {
     NameAndType(CpInfoNameAndType),
     Utf8(CpInfoUtf8),
     String(CpInfoString),
+    Integrer(CpInfoInteger),
+    Float(CpInfoFloat),
+    Long(CpInfoLong),
+    Double(CpInfoDouble),
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CpInfoInteger {
+    pub tag: String,
+    pub bytes: u32,
+}
+#[derive(Debug, Default, Clone)]
+pub struct CpInfoFloat {
+    pub tag: String,
+    pub bytes: f32,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CpInfoLong {
+    pub tag: String,
+    pub high_bytes: u32,
+    pub low_bytes: u32,
+    pub bytes: u64,
+}
+#[derive(Debug, Default, Clone)]
+pub struct CpInfoDouble {
+    pub tag: String,
+    pub high_bytes: u32,
+    pub low_bytes: u32,
+    pub bytes: f64,
 }
 
 #[derive(Debug, Default, Clone)]

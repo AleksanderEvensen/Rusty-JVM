@@ -1,12 +1,35 @@
 public class MyProgram {
 	public static void main(String[] args) {
-		System.out.println("Starting...");
-		System.out.println("1");
-		System.out.println("2");
-		System.out.println("3");
-		System.out.println("Hello World, from Java!");
-		System.out.print("Hello ");
-		System.out.print("World\n");
+
+		int x = 10;
+		System.out.println(x);
+		// float pi = 3.14f;
+		// long somethingBig = Long.MAX_VALUE;
+		// double somethingPrecise = Double.MIN_VALUE;
+
+
+		// System.out.print("x = ");
+		// System.out.println(x);
+
+		// System.out.print("pi = ");
+		// System.out.println(pi);
+		
+		// System.out.print("somethingBig = ");
+		// System.out.println(somethingBig);
+		
+		// System.out.print("somethingPrecise = ");
+		// System.out.println(somethingPrecise);
+
+
+
+		// System.out.println("Starting...");
+		// System.out.println("1");
+		// System.out.println("2");
+		// System.out.println("3");
+		// System.out.println("");
+		// System.out.println("Hello World, from Java!");
+		// System.out.print("Hello ");
+		// System.out.print("World\n");
 		// printName("User", "69");
 	}
 

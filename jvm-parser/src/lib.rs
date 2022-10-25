@@ -224,7 +224,7 @@ impl ClassFile {
 }
 
 impl ClassFile {
-    pub fn get_main_method(&self) -> Option<(&MethodInfo, Vec<u8>)> {
+    pub fn get_main_method(&self) -> Option<(&MethodInfo, CodeAttribute)> {
         if let Some(method) = self.methods.iter().find(|&v| {
             if let Some(name) = &self.constant_pool.get_utf8_at(v.name_index) {
                 if name.data.as_str() == "main" {
@@ -236,17 +236,17 @@ impl ClassFile {
                 false
             }
         }) {
-            let mut code_bytes: Option<Vec<u8>> = None;
+            let mut code: Option<CodeAttribute> = None;
 
             for attribute in method.attributes.iter() {
                 if let AttributeInfoData::Code(data) = &attribute.attribute {
-                    code_bytes = Some(data.code.clone())
+                    code = Some(data.clone())
                 }
             }
 
-            let code_bytes = code_bytes.unwrap();
+            let code = code.unwrap();
 
-            return Some((method, code_bytes));
+            return Some((method, code));
         }
 
         None
