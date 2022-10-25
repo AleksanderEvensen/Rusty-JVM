@@ -166,7 +166,7 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
                         stack.push_back(StackValue::Float(float.bytes));
                     }
 
-                    CpInfo::Integrer(int) => {
+                    CpInfo::Integer(int) => {
                         stack.push_back(StackValue::SignedInteger(int.bytes));
                     }
 

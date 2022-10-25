@@ -48,7 +48,7 @@ impl ConstantPool {
                         .for_each(|(i, byte)| byte_array[i] = byte.clone());
 
                     println!("{:?}", byte_array);
-                    CpInfo::Integrer(CpInfoInteger {
+                    CpInfo::Integer(CpInfoInteger {
                         tag: "CONSTANT_Integer".to_string(),
                         bytes: i32::from_be_bytes(byte_array),
                     })
@@ -188,7 +188,7 @@ pub enum CpInfo {
     NameAndType(CpInfoNameAndType),
     Utf8(CpInfoUtf8),
     String(CpInfoString),
-    Integrer(CpInfoInteger),
+    Integer(CpInfoInteger),
     Float(CpInfoFloat),
     Long(CpInfoLong),
     Double(CpInfoDouble),
