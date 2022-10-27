@@ -3,8 +3,8 @@ pub mod content_pool;
 pub mod utils;
 
 use attributes::{
-    AttributeInfo, AttributeInfoData, CodeAttribute, ExceptionTable, LineNumber,
-    LineNumberTableAttribute, SourceFileAttribute,
+    AttributeInfo, AttributeInfoData, BootstrapMethod, BootstrapMethodsAttribute, CodeAttribute,
+    ExceptionTable, LineNumber, LineNumberTableAttribute, SourceFileAttribute,
 };
 use content_pool::{ConstantPool, CpInfo};
 use std::{error::Error, path::PathBuf};
@@ -37,6 +37,11 @@ impl ClassFile {
             major_version: read_u2(&mut bytes),
             ..Default::default()
         };
+
+        println!(
+            "Magic: {:X?}\nVersion: {} : {}",
+            class_file.magic, class_file.major_version, class_file.minor_version
+        );
 
         // Read Constant Pool
         let constant_pool_count = read_u2(&mut bytes);
@@ -204,6 +209,42 @@ impl ClassFile {
                     "SourceFile" => AttributeInfoData::SourceFile(SourceFileAttribute {
                         sourcefile_index: read_u2(bytes),
                     }),
+
+                    "BootstrapMethods" => {
+                        let attribute_name_index = read_u2(bytes);
+                        #[allow(unused_variables)]
+                        let attribute_length = read_u4(bytes);
+                        let num_bootstrap_methods = read_u2(bytes);
+                        let mut bootstrap_methods = vec![];
+
+                        println!("Method Count: {}", num_bootstrap_methods);
+                        println!("Attribute Length: {}", attribute_length);
+
+                        for _ in 0..num_bootstrap_methods as usize {
+                            let bootstrap_method_ref = read_u2(bytes);
+                            let num_bootstrap_arguments = read_u2(bytes);
+                            let mut bootstrap_arguments = vec![];
+
+                            println!("Arg length: {}", num_bootstrap_arguments);
+                            for _ in 0..num_bootstrap_arguments as usize {
+                                println!("Bytes left: {:?}", bytes);
+                                let arg_index = read_u2(bytes);
+                                bootstrap_arguments.push(arg_index);
+                            }
+
+                            bootstrap_methods.push(BootstrapMethod {
+                                bootstrap_method_ref,
+                                bootstrap_arguments,
+                            });
+                        }
+
+                        println!("Hello");
+
+                        AttributeInfoData::BootstrapMethods(BootstrapMethodsAttribute {
+                            attribute_name_index,
+                            bootstrap_methods,
+                        })
+                    }
 
                     not_implemented_type => {
                         todo!(

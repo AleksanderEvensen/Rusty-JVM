@@ -1,46 +1,17 @@
 public class MyProgram {
 	public static void main(String[] args) {
 
-		int x = 10;
-		float pi = 3.14f;
+		int x = 9;
+		// int y = -2000;
+		// float pi = 3.14f;
 		// long somethingBig = Long.MAX_VALUE;
 		// double somethingPrecise = Double.MIN_VALUE;
 
+		System.out.println("x = " + x);
+		// System.out.println("pi = " + pi);
+		// System.out.println(6.28f);
+		// System.out.println(-10);
+		// System.out.println("y = " + y);
 
-		System.out.print("x = ");
-		System.out.println(x);
-
-		System.out.print("pi = ");
-		System.out.println(pi);
-
-		System.out.println(6.28f);
-		System.out.println(-10);
-
-
-		// System.out.print("somethingBig = ");
-		// System.out.println(somethingBig);
-		
-		// System.out.print("somethingPrecise = ");
-		// System.out.println(somethingPrecise);
-
-
-
-		// System.out.println("Starting...");
-		// System.out.println("1");
-		// System.out.println("2");
-		// System.out.println("3");
-		// System.out.println("");
-		// System.out.println("Hello World, from Java!");
-		// System.out.print("Hello ");
-		// System.out.print("World\n");
-		// printName("User", "69");
 	}
-
-	// public static void printName(String name, String age) {
-	// 	System.out.print("Hello my name is ");
-	// 	System.out.print(name);
-	// 	System.out.print(", and i am ");
-	// 	System.out.print(age);
-	// 	System.out.print("years old\n");
-	// }
 }

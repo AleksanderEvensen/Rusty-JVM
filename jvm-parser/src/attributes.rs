@@ -10,10 +10,9 @@ pub enum AttributeInfoData {
     None,
 
     Code(CodeAttribute),
-
     LineNumberTable(LineNumberTableAttribute),
-
     SourceFile(SourceFileAttribute),
+    BootstrapMethods(BootstrapMethodsAttribute),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -47,4 +46,16 @@ pub struct ExceptionTable {
     pub end_pc: u16,
     pub handler_pc: u16,
     pub catch_type: u16,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct BootstrapMethodsAttribute {
+    pub attribute_name_index: u16,
+    pub bootstrap_methods: Vec<BootstrapMethod>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct BootstrapMethod {
+    pub bootstrap_method_ref: u16,
+    pub bootstrap_arguments: Vec<u16>,
 }

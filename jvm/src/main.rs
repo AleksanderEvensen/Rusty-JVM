@@ -1,5 +1,7 @@
-use std::collections::VecDeque;
+use core::panic;
+use std::path::PathBuf;
 
+use clap::Parser;
 use jvm_parser::{
     self,
     attributes::CodeAttribute,
@@ -8,86 +10,14 @@ use jvm_parser::{
     ClassFile,
 };
 
-#[allow(non_camel_case_types)]
-#[derive(Debug)]
-pub enum OpCodes {
-    OpCodeError,
-    nop,
-    getstatic,
-    ldc,
-    invokevirtual,
-    bipush,
+use crate::{
+    jvm::{opcodes::OpCodes, traits::JavaClass, DebugLevel, JVM},
+    utils::parse_descriptor,
+};
 
-    istore_(usize),
-    iconst_(i32),
-    iload_(usize),
-
-    fstore_(usize),
-    fconst_(f32),
-    fload_(usize),
-
-    Return,
-}
-
-impl From<u8> for OpCodes {
-    fn from(v: u8) -> Self {
-        match v {
-            0x00 => OpCodes::nop,
-            0xb2 => OpCodes::getstatic,
-            0x12 => OpCodes::ldc,
-            0xb6 => OpCodes::invokevirtual,
-            0x10 => OpCodes::bipush,
-
-            0x3b => OpCodes::istore_(0),
-            0x3c => OpCodes::istore_(1),
-            0x3d => OpCodes::istore_(2),
-            0x3e => OpCodes::istore_(3),
-
-            0x2 => OpCodes::iconst_(-1),
-            0x3 => OpCodes::iconst_(0),
-            0x4 => OpCodes::iconst_(1),
-            0x5 => OpCodes::iconst_(2),
-            0x6 => OpCodes::iconst_(3),
-            0x7 => OpCodes::iconst_(4),
-
-            0x1a => OpCodes::iload_(0),
-            0x1b => OpCodes::iload_(1),
-            0x1c => OpCodes::iload_(2),
-            0x1d => OpCodes::iload_(3),
-
-            0x43 => OpCodes::fstore_(0),
-            0x44 => OpCodes::fstore_(1),
-            0x45 => OpCodes::fstore_(2),
-            0x46 => OpCodes::fstore_(3),
-
-            0xb => OpCodes::fconst_(0.0),
-            0xc => OpCodes::fconst_(1.0),
-            0xd => OpCodes::fconst_(2.0),
-
-            0x22 => OpCodes::fload_(0),
-            0x23 => OpCodes::fload_(1),
-            0x24 => OpCodes::fload_(2),
-            0x25 => OpCodes::fload_(3),
-
-            0xb1 => OpCodes::Return,
-            _ => OpCodes::OpCodeError,
-        }
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Default)]
-enum StackValue {
-    Integer(u32),
-    SignedInteger(i32),
-    Float(f32),
-    String(String),
-    Byte(u8),
-    ObjectRef(StackObjectRef),
-    Invalid,
-    #[default]
-    None,
-}
+pub mod java_mappings;
+mod jvm;
+pub mod utils;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -96,21 +26,23 @@ struct StackObjectRef {
     member_name: String,
     descriptor: String,
 }
-
+/*
 fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
     let mut bytes = code_data.code;
 
-    let mut stack: VecDeque<StackValue> = vec![].into();
+    let mut java_objects: Vec<Box<dyn JavaClass>> = vec![];
 
-    let mut frame: VecDeque<StackValue> =
-        vec![StackValue::default(); code_data.max_locals as usize].into();
+    let mut stack: Vec<StackValue> = vec![];
+    let mut frame: Vec<StackValue> = vec![StackValue::default(); code_data.max_locals as usize];
+
+    // TODO: Implement some debug logging if the app runs with verbose enabled
 
     while bytes.len() > 0 {
         let opcode_byte = read_u1(&mut bytes);
 
         let opcode = OpCodes::from(opcode_byte);
 
-        // println!("Running OpCode: {:?}", opcode);
+        println!("Running OpCode: {:?}", opcode);
 
         match opcode {
             OpCodes::getstatic => {
@@ -141,7 +73,7 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
                     .data
                     .clone();
 
-                stack.push_back(StackValue::ObjectRef(StackObjectRef {
+                stack.push(StackValue::ObjectRef(StackObjectRef {
                     class_name,
                     member_name,
                     descriptor,
@@ -154,20 +86,18 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
                 match &class_file.constant_pool.0[index as usize - 1] {
                     CpInfo::String(str) => {
                         match &class_file.constant_pool.0[str.string_index as usize - 1] {
-                            CpInfo::Utf8(utf8) => {
-                                stack.push_back(StackValue::String(utf8.data.clone()))
-                            }
+                            CpInfo::Utf8(utf8) => stack.push(StackValue::String(utf8.data.clone())),
 
                             _ => {}
                         }
                     }
 
                     CpInfo::Float(float) => {
-                        stack.push_back(StackValue::Float(float.bytes));
+                        stack.push(StackValue::Float(float.bytes));
                     }
 
                     CpInfo::Integer(int) => {
-                        stack.push_back(StackValue::SignedInteger(int.bytes));
+                        stack.push(StackValue::SignedInteger(int.bytes));
                     }
 
                     pool_type => {
@@ -197,36 +127,74 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
                     .constant_pool
                     .get_utf8_at(name_type.name_index)
                     .unwrap();
-                // let descriptor = class_file
-                //     .get_utf8_from_pool(name_type.descriptor_index)
-                //     .unwrap();
+                let descriptor = class_file
+                    .constant_pool
+                    .get_utf8_at(name_type.descriptor_index)
+                    .unwrap();
 
-                if let StackValue::ObjectRef(_) = stack.pop_front().unwrap() {}
+                println!("{:#?}", (&class_name.data, &name_type_name.data));
+                println!("Stack: {:#?}", stack);
 
-                if class_name.data == "java/io/PrintStream" {
-                    match name_type_name.data.as_str() {
-                        "println" => match stack.pop_front().unwrap() {
+                let descriptor_data = parse_descriptor(&descriptor.data);
+
+                let mut args: Vec<StackValue> = vec![];
+
+                for _ in descriptor_data.parameters {
+                    args.push(stack.pop().unwrap());
+                }
+
+                let objref = if let StackValue::JavaObjectRef(value) = stack.pop().unwrap() {
+                    value
+                } else {
+                    panic!("This isn'y supposed to happen");
+                };
+
+                println!("{:#?}", (args, objref));
+
+                println!("");
+                println!("");
+                println!("");
+
+                // let objectref_index =
+                //     stack.len() as i32 - descriptor_data.parameters.len() as i32 + 1;
+
+                // let objectref = if objectref_index >= 0 && objectref_index < stack.len() as i32 {
+                //     stack.remove(objectref_index as usize)
+                // } else {
+                //     None
+                // };
+
+                // let objectref = if let StackValue::ObjectRef(value) = objectref.unwrap() {
+                //     value
+                // } else {
+                //     panic!("object ref not in the stack position in invokevirtual")
+                // };
+
+                // println!("{:#?}", objectref);
+
+                match class_name.data.as_str() {
+                    "java/io/PrintStream" => match name_type_name.data.as_str() {
+                        "println" => match stack.pop().unwrap() {
                             StackValue::Float(v) => {
-                                println!("{}", v)
+                                println!("Float: {}", v)
                             }
                             StackValue::Integer(v) => {
-                                println!("{}", v)
+                                println!("Int: {}", v)
                             }
                             StackValue::String(v) => {
-                                println!("{}", v)
+                                println!("String: {}", v)
                             }
-
                             StackValue::Byte(v) => {
-                                println!("{}", v)
+                                println!("Byte: {}", v)
                             }
                             StackValue::SignedInteger(v) => {
-                                println!("{}", v)
+                                println!("Signed: {}", v)
                             }
                             invalid_data => {
                                 panic!("Invalid data on the stack, {:#?}", invalid_data);
                             }
                         },
-                        "print" => match stack.pop_front().unwrap() {
+                        "print" => match stack.pop().unwrap() {
                             StackValue::Float(v) => {
                                 print!("{}", v)
                             }
@@ -240,20 +208,144 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
                                 panic!("Invalid data on the stack, {:#?}", invalid_data);
                             }
                         },
-                        _ => {}
+                        v => {
+                            panic!("Invokevirtual method ( {} ), isn't implemented", v);
+                        }
+                    },
+
+                    "java/lang/StringBuilder" => match name_type_name.data.as_str() {
+                        "append" => {
+                            // if let Some(first_arg) = descriptor_data.parameters.get(0) {
+                            // match first_arg {
+                            //     DescriptorTypes::Class(v) => {}
+
+                            //     DescriptorTypes::Int => {}
+                            // }
+                            // }
+
+                            // descriptor_data.parameters.len();
+
+                            println!("{:?}  {:?}", "append", descriptor.data);
+                        }
+
+                        "toString" => {
+                            todo!("Implement toString for StringBuilder");
+                        }
+                        v => {
+                            panic!("Invokevirtual method ( {} ), isn't implemented", v);
+                        }
+                    },
+
+                    v => {
+                        panic!("[Invokevirtual] The class ( {} ) is not implemented", v);
                     }
                 }
+
+                if class_name.data == "java/io/PrintStream" {}
+            }
+
+            OpCodes::invokespecial => {
+                let index = read_u2(&mut bytes);
+
+                let (_, class, name_type) =
+                    class_file.constant_pool.get_refs_ext_at(index).unwrap();
+
+                let class_name = class_file
+                    .constant_pool
+                    .get_utf8_at(class.name_index)
+                    .unwrap();
+                let name_type_name = class_file
+                    .constant_pool
+                    .get_utf8_at(name_type.name_index)
+                    .unwrap();
+                let descriptor = class_file
+                    .constant_pool
+                    .get_utf8_at(name_type.descriptor_index)
+                    .unwrap();
+
+                let objref = stack.pop();
+
+                println!("{:?}", (descriptor, objref));
+
+                // println!("{:#?}", (class_name, name_type_name, descriptor, objref));
+
+                match name_type_name.data.as_str() {
+                    "<init>" => match class_name.data.as_str() {
+                        "java/lang/StringBuilder" => {
+                            java_objects.push(Box::new(
+                                crate::java_mappings::java::lang::StringBuilder::StringBuilder::new(
+                                ),
+                            ));
+                            stack.push(StackValue::JavaObjectRef(java_objects.len() - 1));
+                        }
+
+                        v => {
+                            panic!("Init Method for ( {} ) is not implemented in OpCode::invokespecial", v)
+                        }
+                    },
+
+                    _ => {}
+                };
+
+                // panic!("Invokespecial not implemented");
             }
 
             OpCodes::bipush => {
                 let byte = read_u1(&mut bytes);
-                stack.push_back(StackValue::SignedInteger(i32::from_be_bytes([
+                stack.push(StackValue::SignedInteger(i32::from_be_bytes([
                     0, 0, 0, byte,
                 ])));
             }
 
+            OpCodes::sipush => {
+                // TODO: Change this to a short stack value(i16) instead of a signed 32 bit integer
+                let value = read_u2(&mut bytes).to_be_bytes();
+                let sign_extended = i32::from(i16::from_be_bytes(value));
+                stack.push(StackValue::SignedInteger(sign_extended));
+            }
+
+            OpCodes::new => {
+                // Should be index to class or interface
+                let index = read_u2(&mut bytes) as usize;
+
+                if let CpInfo::Class(class) = &class_file.constant_pool.0[index - 1] {
+                    println!("Class: {:?}", class);
+                    let class_name = class_file
+                        .constant_pool
+                        .get_utf8_at(class.name_index)
+                        .unwrap();
+                    println!("Initialize class {}", class_name.data);
+
+                    match class_name.data.as_str() {
+                        "java/io/PrintStream" => {
+                            java_objects.push(Box::new(
+                                crate::java_mappings::java::io::PrintStream::PrintStream::new(),
+                            ));
+
+                            stack.push(StackValue::JavaObjectRef(java_objects.len() - 1))
+                        }
+
+                        _ => {}
+                    }
+
+                    // stack.push(StackValue::ObjectRef(StackObjectRef {
+                    //     class_name: class_name.data.clone(),
+                    //     member_name: "".to_string(), // TODO: I dont know if this is right, but check later
+                    //     descriptor: "".to_string(),
+                    // }))
+                } else if false { // TODO: Implement for CpInfo::Interface, when that is created
+                } else {
+                    panic!("OpCode::newm should have an index to either CpInfo::Class or CpInfo::Interface, not {:?}", &class_file.constant_pool.0[index - 1]);
+                }
+            }
+
+            OpCodes::dup => {
+                let last_element = stack.last().unwrap().clone();
+                stack.push(last_element);
+            }
+
             OpCodes::istore_(n) => {
-                if let Some(int) = stack.pop_back() {
+                if let Some(int) = stack.pop() {
                     if let StackValue::SignedInteger(int) = int {
                         frame[n] = StackValue::SignedInteger(int);
                     } else {
@@ -266,17 +358,17 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
 
             OpCodes::iload_(n) => {
                 if let StackValue::SignedInteger(int) = frame[n] {
-                    stack.push_back(StackValue::SignedInteger(int));
+                    stack.push(StackValue::SignedInteger(int));
                     frame[n] = StackValue::None;
                 }
             }
 
             OpCodes::iconst_(n) => {
-                stack.push_back(StackValue::SignedInteger(n));
+                stack.push(StackValue::SignedInteger(n));
             }
 
             OpCodes::fstore_(n) => {
-                if let Some(float) = stack.pop_back() {
+                if let Some(float) = stack.pop() {
                     if let StackValue::Float(float) = float {
                         frame[n] = StackValue::Float(float);
                     } else {
@@ -289,14 +381,14 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
 
             OpCodes::fload_(n) => {
                 if let StackValue::Float(float) = frame[n] {
-                    stack.push_back(StackValue::Float(float));
+                    stack.push(StackValue::Float(float));
                 } else {
                     panic!("The frame value at index ( {} ) is either empty or doesn't contain float value", n);
                 }
             }
 
             OpCodes::fconst_(float) => {
-                stack.push_back(StackValue::Float(float));
+                stack.push(StackValue::Float(float));
             }
 
             // Return void (do nothing)
@@ -318,12 +410,35 @@ fn execute_code(class_file: &ClassFile, code_data: CodeAttribute) {
     }
 }
 
+*/
+
+#[derive(Parser, Debug)]
+#[command(author,version,about,long_about = None)]
+struct Args {
+    /// The path to the .jar or .class file to be executed
+    path: Option<PathBuf>,
+
+    /// Toggles the debug prints
+    #[arg(short, long)]
+    debug: bool,
+}
+
 fn main() {
-    let class_file = ClassFile::from_file("./java/MyProgram.class".into()).unwrap();
+    let args = Args::parse();
 
-    if let Some((method, code)) = class_file.get_main_method() {
-        execute_code(&class_file, code)
-    }
+    let file_path = args
+        .path
+        .or_else(|| Some("./java/MyProgram.class".into()))
+        .unwrap();
 
-    println!("Hello, world, from Rust!");
+    let class_file = ClassFile::from_file(file_path).unwrap();
+
+    let mut jvm = JVM::new(class_file);
+
+    jvm.set_debug_level(if args.debug {
+        DebugLevel::Debug
+    } else {
+        DebugLevel::None
+    });
+    jvm.run_main().unwrap();
 }

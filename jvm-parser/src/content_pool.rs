@@ -48,6 +48,7 @@ impl ConstantPool {
                         .for_each(|(i, byte)| byte_array[i] = byte.clone());
 
                     println!("{:?}", byte_array);
+                    println!("Hello World, Why isn't this executed");
                     CpInfo::Integer(CpInfoInteger {
                         tag: "CONSTANT_Integer".to_string(),
                         bytes: i32::from_be_bytes(byte_array),
@@ -105,22 +106,26 @@ impl ConstantPool {
                     })
                 }
 
-                15 => {
-                    todo!("CONSTANT_MethodHandle not implemented")
-                }
+                15 => CpInfo::MethodHandle(CpInfoMethodHandle {
+                    tag: "CONSTANT_MethodHandle".to_string(),
+                    reference_kind: read_u1(bytes),
+                    reference_index: read_u2(bytes),
+                }),
 
                 16 => {
                     todo!("CONSTANT_MethodType not implemented")
                 }
 
-                18 => {
-                    todo!("CONSTANT_InvokeDynamic not implemented")
-                }
+                18 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic {
+                    tag: "CONSTANT_InvokeDynamic".to_string(),
+                    bootstrap_method_attr_index: read_u2(bytes),
+                    name_and_type_index: read_u2(bytes),
+                }),
                 unknown_tag => {
                     panic!("Unknown CONSTANT_TYPE: {}", unknown_tag)
                 }
             };
-            // println!("cp_info = {:?}", cp_info);
+            println!("[{}] cp_info = {:?}", pool.0.len() + 1, cp_info);
             pool.0.push(cp_info);
         }
         pool
@@ -192,6 +197,8 @@ pub enum CpInfo {
     Float(CpInfoFloat),
     Long(CpInfoLong),
     Double(CpInfoDouble),
+    InvokeDynamic(CpInfoInvokeDynamic),
+    MethodHandle(CpInfoMethodHandle),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -248,4 +255,18 @@ pub struct CpInfoUtf8 {
 pub struct CpInfoString {
     pub tag: String,
     pub string_index: u16,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CpInfoInvokeDynamic {
+    pub tag: String,
+    pub bootstrap_method_attr_index: u16,
+    pub name_and_type_index: u16,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CpInfoMethodHandle {
+    pub tag: String,
+    pub reference_kind: u8,
+    pub reference_index: u16,
 }

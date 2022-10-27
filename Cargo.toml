@@ -1,6 +1,7 @@
 [workspace]
 members = [
 	"jvm-parser",
-	"jvm"
+	"jvm",
+	"macros",
 ]
 
