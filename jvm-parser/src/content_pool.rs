@@ -131,6 +131,10 @@ impl ConstantPool {
         pool
     }
 
+    pub fn get_at(&self, index: u16) -> &CpInfo {
+        &self.0[index as usize - 1]
+    }
+
     pub fn get_class_at(&self, index: u16) -> Option<&CpInfoClass> {
         if let CpInfo::Class(class) = &self.0[index as usize - 1] {
             return Some(class);
