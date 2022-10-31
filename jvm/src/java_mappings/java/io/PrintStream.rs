@@ -1,16 +1,19 @@
-use crate::jvm::traits::JavaClass;
+use crate::jvm::traits::{JavaClass, JavaClassExecContext, JavaClassInit, JavaClassInitContext};
 
 pub struct PrintStream {}
 
-impl PrintStream {
-    pub fn println() {}
-    pub fn create_class() -> Box<dyn JavaClass> {
+impl JavaClassInit for PrintStream {
+    fn construct(ctx: JavaClassInitContext) -> Box<dyn JavaClass> {
         Box::new(Self {})
     }
 }
 
 impl JavaClass for PrintStream {
-    fn execute(&self, ctx: crate::jvm::traits::JavaClassExecContext) {
+    fn execute(&self, ctx: JavaClassExecContext) {
+        todo!()
+    }
+
+    fn get_class_field(&self, field_name: &str) -> Box<&dyn JavaClass> {
         todo!()
     }
 }
