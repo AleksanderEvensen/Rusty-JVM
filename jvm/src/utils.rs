@@ -1,6 +1,6 @@
 use std::str::Chars;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DescriptorTypes {
     Void,
     Byte,
@@ -15,7 +15,7 @@ pub enum DescriptorTypes {
     Array(String, u16),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DescriptorResult {
     pub return_value: DescriptorTypes,
     pub parameters: Vec<DescriptorTypes>,
@@ -105,4 +105,56 @@ fn parse_class(iter: &mut Chars) -> DescriptorTypes {
     }
 
     DescriptorTypes::Class(class_type)
+}
+
+#[cfg(test)]
+mod descriptor_tests {
+    use super::{parse_descriptor, DescriptorResult, DescriptorTypes};
+
+    #[test]
+    fn parsing_byte_void() {
+        let byte_void = parse_descriptor(&"(B)V".to_string());
+        assert_eq!(
+            byte_void,
+            DescriptorResult {
+                return_value: DescriptorTypes::Void,
+                parameters: vec![DescriptorTypes::Byte]
+            }
+        )
+    }
+    #[test]
+    fn parsing_char_bool() {
+        let char_bool = parse_descriptor(&"(C)Z".to_string());
+        assert_eq!(
+            char_bool,
+            DescriptorResult {
+                return_value: DescriptorTypes::Boolean,
+                parameters: vec![DescriptorTypes::Char]
+            }
+        )
+    }
+    #[test]
+    fn parsing_class_bool_array() {
+        let class_bool_array = parse_descriptor(&"(Ljava/io/PrintStream;)[B".to_string());
+
+        assert_eq!(
+            class_bool_array,
+            DescriptorResult {
+                return_value: DescriptorTypes::Array("B".to_string(), 1),
+                parameters: vec![DescriptorTypes::Class("java/io/PrintStream".to_string())]
+            }
+        )
+    }
+
+    #[test]
+    fn parsing_multidim_array() {
+        let multidim_array = parse_descriptor(&"()[[[[B".to_string());
+        assert_eq!(
+            multidim_array,
+            DescriptorResult {
+                return_value: DescriptorTypes::Array("B".to_string(), 4),
+                parameters: vec![]
+            }
+        )
+    }
 }

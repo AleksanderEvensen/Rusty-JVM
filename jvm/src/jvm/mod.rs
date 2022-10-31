@@ -119,7 +119,8 @@ impl JVM {
                     );
 
                     if !static_classes.contains_key(&class_name) {
-                        let class = get_class_constructor(&class_name)(JavaClassInitContext {});
+                        let class =
+                            get_class_constructor(&class_name)(JavaClassInitContext::empty());
                         static_classes.insert(String::from(&class_name), class);
                     }
 
@@ -167,7 +168,7 @@ impl JVM {
                         .get_refs_ext_at(index)
                         .unwrap();
 
-                    let _class_name = self
+                    let class_name = self
                         .class_file
                         .constant_pool
                         .get_utf8_at(class.name_index)
@@ -175,7 +176,7 @@ impl JVM {
                         .data
                         .clone();
 
-                    let _name_type_name = self
+                    let name_type_name = self
                         .class_file
                         .constant_pool
                         .get_utf8_at(name_type.name_index)
@@ -190,13 +191,20 @@ impl JVM {
                         .data
                         .clone();
 
-                    let _descriptor = parse_descriptor(&descriptor);
+                    let descriptor = parse_descriptor(&descriptor);
 
                     #[cfg(feature = "debug")]
                     println!(
                         "[OpCodes : invokespecial] Invoking {:#?}",
-                        (&_class_name, &_name_type_name, &_descriptor)
+                        (&class_name, &name_type_name, &descriptor)
                     );
+
+                    if name_type_name == "<init>" {
+                        let java_class =
+                            get_class_constructor(&class_name)(JavaClassInitContext::empty());
+                    } else {
+                    }
+
                     todo!("OpCode invokespecial")
                 }
 
@@ -228,7 +236,8 @@ impl JVM {
                         (&class, &class_name)
                     );
 
-                    let java_class = get_class_constructor(&class_name)(JavaClassInitContext {});
+                    let java_class =
+                        get_class_constructor(&class_name)(JavaClassInitContext::empty());
                     java_objects.push(java_class);
 
                     operand_stack.push(StackValue::JavaObjectRef(JavaObjectRef {
