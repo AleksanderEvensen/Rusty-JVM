@@ -115,7 +115,7 @@ impl JVM {
                     #[cfg(feature = "debug")]
                     println!(
                         "[OpCodes : getstatic] Initialize new: {:#?}",
-                        (&class_name, &name_type_name, &descriptor)
+                        (&class_name, &_name_type_name, &_descriptor)
                     );
 
                     if !static_classes.contains_key(&class_name) {
@@ -195,7 +195,7 @@ impl JVM {
                     #[cfg(feature = "debug")]
                     println!(
                         "[OpCodes : invokespecial] Invoking {:#?}",
-                        (&class_name, &name_type_name, &descriptor)
+                        (&_class_name, &_name_type_name, &_descriptor)
                     );
                     todo!("OpCode invokespecial")
                 }
