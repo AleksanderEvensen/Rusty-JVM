@@ -136,35 +136,35 @@ impl ConstantPool {
     }
 
     pub fn get_class_at(&self, index: u16) -> Option<&CpInfoClass> {
-        if let CpInfo::Class(class) = &self.0[index as usize - 1] {
+        if let CpInfo::Class(class) = &self.get_at(index) {
             return Some(class);
         }
         None
     }
 
     pub fn get_refs_at(&self, index: u16) -> Option<&CpInfoRefs> {
-        if let CpInfo::Refs(refs) = &self.0[index as usize - 1] {
+        if let CpInfo::Refs(refs) = &self.get_at(index) {
             return Some(refs);
         }
         None
     }
 
     pub fn get_name_type_at(&self, index: u16) -> Option<&CpInfoNameAndType> {
-        if let CpInfo::NameAndType(name_type) = &self.0[index as usize - 1] {
+        if let CpInfo::NameAndType(name_type) = &self.get_at(index) {
             return Some(name_type);
         }
         None
     }
 
     pub fn get_utf8_at(&self, index: u16) -> Option<&CpInfoUtf8> {
-        if let CpInfo::Utf8(utf8) = &self.0[index as usize - 1] {
+        if let CpInfo::Utf8(utf8) = &self.get_at(index) {
             return Some(utf8);
         }
         None
     }
 
     pub fn get_string_at(&self, index: u16) -> Option<&CpInfoString> {
-        if let CpInfo::String(str) = &self.0[index as usize - 1] {
+        if let CpInfo::String(str) = &self.get_at(index) {
             return Some(str);
         }
         None

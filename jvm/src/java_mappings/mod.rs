@@ -1,21 +1,13 @@
-// use crate::jvm::traits::{JavaClass, JavaClassInitContext};
-
-// #[macro_export]
-// macro_rules! generate_mappings {
-//     ($namespace:expr, $($class:ident),*) => {
-// 		vec![
-// 			$((format!("{}{}",$namespace,stringify!($class)), Box::new($class))),*
-// 		]
-//     };
-// }
-
 pub mod java;
+pub mod javax;
 
-// pub fn get_method_map() {
-//     let methods: Vec<(String, fn(JavaClassInitContext) -> Box<dyn JavaClass>)> = vec![];
+extern crate macros;
+use macros::generate_mappings;
 
-//     methods.append(&mut self::java::io::get_method_map());
-//     methods.append(&mut self::java::lang::get_method_map());
+use crate::jvm::traits::JavaClass;
 
-//     return methods;
-// }
+pub fn get_class_constructor(path: &str) {
+    let test: fn() -> Box<dyn JavaClass> =
+        generate_mappings!(path, create_class, "jvm/src/java_mappings");
+    println!("{:?}", test);
+}

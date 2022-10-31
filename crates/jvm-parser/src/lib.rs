@@ -1,12 +1,12 @@
 pub mod attributes;
-pub mod content_pool;
+pub mod constant_pool;
 pub mod utils;
 
 use attributes::{
     AttributeInfo, AttributeInfoData, BootstrapMethod, BootstrapMethodsAttribute, CodeAttribute,
     ExceptionTable, LineNumber, LineNumberTableAttribute, SourceFileAttribute,
 };
-use content_pool::{ConstantPool, CpInfo};
+use constant_pool::{ConstantPool, CpInfo};
 use std::{error::Error, path::PathBuf};
 use utils::{read_bytes, read_u2, read_u4};
 

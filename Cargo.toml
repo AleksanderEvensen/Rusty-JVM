@@ -1,7 +1,6 @@
 [workspace]
 members = [
-	"jvm-parser",
+	"crates/jvm-parser",
 	"jvm",
-	"macros",
 ]
 

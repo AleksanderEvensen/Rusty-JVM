@@ -3,12 +3,13 @@ pub mod traits;
 
 use jvm_parser::{
     attributes::CodeAttribute,
-    content_pool::CpInfo,
+    constant_pool::CpInfo,
     utils::{read_u1, read_u2},
     ClassFile, MethodInfo,
 };
 use opcodes::OpCodes;
 
+#[allow(dead_code)]
 pub enum DebugLevel {
     None = 0,
     Log = 1,
@@ -77,7 +78,7 @@ impl JVM {
                 OpCodes::getstatic => {
                     let index = read_u2(&mut bytes);
 
-                    let (refs, class, name_type) = self
+                    let (_, class, name_type) = self
                         .class_file
                         .constant_pool
                         .get_refs_ext_at(index)
@@ -104,16 +105,19 @@ impl JVM {
                         .unwrap()
                         .data
                         .clone();
+                    println!(
+                        "[OpCodes : getstatic] Initialize new: {:#?}",
+                        (&class_name, &name_type_name, &descriptor)
+                    );
 
                     operand_stack.push(StackValue::JavaObjectRef(JavaObjectRef {
-                        index: 0,
+                        index: 255,
                         class_name: class_name,
                     }));
                 }
 
                 OpCodes::ldc => {
                     let index = read_u2(&mut bytes);
-
                     let value = match &self.class_file.constant_pool.get_at(index) {
                         CpInfo::String(str) => {
                             let text = self
@@ -156,7 +160,22 @@ impl JVM {
                 }
 
                 OpCodes::new => {
-                    todo!("OpCode new")
+                    let index = read_u2(&mut bytes);
+
+                    let class = self.class_file.constant_pool.get_class_at(index).unwrap();
+
+                    let class_name = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(class.name_index)
+                        .unwrap();
+
+                    println!(
+                        "[OpCodes : new] Initialize new class: {:#?}",
+                        (class, class_name.data.clone())
+                    )
+
+                    // todo!("OpCode new")
                 }
 
                 OpCodes::dup => {
@@ -176,7 +195,59 @@ impl JVM {
                     }
                 }
 
-                _ => {}
+                OpCodes::iload_(n) => {
+                    if let StackValue::Integer(int) = frame[n] {
+                        operand_stack.push(StackValue::Integer(int));
+                        frame[n] = StackValue::None;
+                    }
+                }
+
+                OpCodes::iconst_(n) => {
+                    operand_stack.push(StackValue::Integer(n));
+                }
+
+                OpCodes::fstore_(n) => {
+                    if let Some(float) = operand_stack.pop() {
+                        if let StackValue::Float(float) = float {
+                            frame[n] = StackValue::Float(float);
+                        } else {
+                            panic!("The value gathered from the stack is not a float")
+                        }
+                    } else {
+                        panic!("Oops seems like the stack is empty. this wasn't supposed to happen")
+                    }
+                }
+
+                OpCodes::fload_(n) => {
+                    if let StackValue::Float(float) = frame[n] {
+                        operand_stack.push(StackValue::Float(float));
+                    } else {
+                        panic!("The frame value at index ( {} ) is either empty or doesn't contain float value", n);
+                    }
+                }
+
+                OpCodes::fconst_(float) => {
+                    operand_stack.push(StackValue::Float(float));
+                }
+
+                // Return or void or do nothing
+                OpCodes::Return | OpCodes::nop => {}
+
+                // Handle the opcodes that ins't implemented
+                OpCodes::OpCodeError => {
+                    println!("Remaining byte code: {:?}", bytes);
+                    panic!(
+                        "The OpCode ( {} ), is not implemented or doesn't exist",
+                        opcode_byte
+                    );
+                }
+                #[allow(unreachable_patterns)]
+                unknown_opcode => {
+                    panic!(
+                        "The OpCode ( {} : {:?} ) is not imeplemented",
+                        opcode_byte, unknown_opcode
+                    )
+                }
             }
         }
     }

@@ -1,14 +1,14 @@
 use crate::jvm::traits::JavaClass;
 
-pub struct StringBuilder {}
+pub struct TestModule;
 
-impl StringBuilder {
+impl TestModule {
     pub fn create_class() -> Box<dyn JavaClass> {
         Box::new(Self {})
     }
 }
 
-impl JavaClass for StringBuilder {
+impl JavaClass for TestModule {
     fn execute(&self, ctx: crate::jvm::traits::JavaClassExecContext) {
         todo!()
     }
