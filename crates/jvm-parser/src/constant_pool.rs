@@ -125,7 +125,6 @@ impl ConstantPool {
                     panic!("Unknown CONSTANT_TYPE: {}", unknown_tag)
                 }
             };
-            println!("[{}] cp_info = {:?}", pool.0.len() + 1, cp_info);
             pool.0.push(cp_info);
         }
         pool

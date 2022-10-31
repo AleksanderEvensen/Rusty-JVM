@@ -38,11 +38,6 @@ impl ClassFile {
             ..Default::default()
         };
 
-        println!(
-            "Magic: {:X?}\nVersion: {} : {}",
-            class_file.magic, class_file.major_version, class_file.minor_version
-        );
-
         // Read Constant Pool
         let constant_pool_count = read_u2(&mut bytes);
         class_file.constant_pool = ConstantPool::from_bytes(&mut bytes, &constant_pool_count);
