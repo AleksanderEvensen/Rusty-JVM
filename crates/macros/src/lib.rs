@@ -4,9 +4,6 @@ use std::{collections::VecDeque, path::PathBuf};
 
 #[proc_macro]
 pub fn generate_mappings(input: TokenStream) -> TokenStream {
-    println!("{:#?}", input);
-    println!();
-
     let inputs: Vec<TokenTree> = input.into_iter().collect();
 
     if inputs.len() < 2 {
@@ -22,8 +19,6 @@ pub fn generate_mappings(input: TokenStream) -> TokenStream {
     let path = iter.next().unwrap();
 
     let mappings = read_dir_recursive(PathBuf::from(path.to_string().replace("\"", "")));
-
-    println!("{:#?}", mappings);
 
     let output = format!(
         "{}\nmatch {} {{ \n{}\nunknown => panic!(\"Java Class ({{}}) is not implemented\", unknown), }}",
