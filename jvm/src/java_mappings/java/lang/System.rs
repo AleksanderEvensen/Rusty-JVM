@@ -9,7 +9,7 @@ pub struct System {
 impl System {}
 
 impl JavaClassInit for System {
-    fn construct(ctx: JavaClassInitContext) -> Box<dyn JavaClass> {
+    fn construct(_ctx: JavaClassInitContext) -> Box<dyn JavaClass> {
         Box::new(Self {
             out: PrintStream {},
         })
@@ -17,7 +17,7 @@ impl JavaClassInit for System {
 }
 
 impl JavaClass for System {
-    fn execute(&self, ctx: crate::jvm::traits::JavaClassExecContext) {
+    fn execute(&self, _ctx: crate::jvm::traits::JavaClassExecContext) {
         todo!()
     }
     fn get_class_field(&self, field_name: &str) -> Box<&dyn JavaClass> {

@@ -1,5 +1,6 @@
 use std::str::Chars;
 
+#[derive(Debug)]
 pub enum DescriptorTypes {
     Void,
     Byte,
@@ -14,6 +15,7 @@ pub enum DescriptorTypes {
     Array(String, u16),
 }
 
+#[derive(Debug)]
 pub struct DescriptorResult {
     pub return_value: DescriptorTypes,
     pub parameters: Vec<DescriptorTypes>,

@@ -1,6 +1,8 @@
 pub mod opcodes;
 pub mod traits;
 
+use std::collections::HashMap;
+
 use jvm_parser::{
     attributes::CodeAttribute,
     constant_pool::CpInfo,
@@ -9,12 +11,12 @@ use jvm_parser::{
 };
 use opcodes::OpCodes;
 
-#[allow(dead_code)]
-pub enum DebugLevel {
-    None = 0,
-    Log = 1,
-    Debug = 2,
-}
+use crate::{
+    java_mappings::get_class_constructor, jvm::traits::JavaClassInitContext,
+    utils::parse_descriptor,
+};
+
+use self::traits::JavaClass;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
@@ -25,6 +27,7 @@ enum StackValue {
     Short(i16),
     Byte(u8),
     JavaObjectRef(JavaObjectRef),
+    JavaStaticClassRef(String),
     Invalid,
     #[default]
     None,
@@ -32,43 +35,46 @@ enum StackValue {
 
 #[derive(Debug, Clone)]
 pub struct JavaObjectRef {
-    index: u8,
-    class_name: String,
+    index: usize,
 }
 
 pub struct JVM {
-    debug_level: u8,
     class_file: ClassFile,
 }
 
 impl JVM {
     pub fn new(class_file: ClassFile) -> Self {
-        Self {
-            class_file,
-            debug_level: DebugLevel::None as u8,
-        }
+        Self { class_file }
     }
 
-    pub fn set_debug_level(&mut self, debug_level: DebugLevel) {
-        self.debug_level = debug_level as u8;
-    }
-
-    pub fn run_main(&self) -> Result<(), String> {
+    pub fn get_main(&self) -> Result<(&MethodInfo, CodeAttribute), String> {
         if let Some((method, code_attribute)) = self.class_file.get_main_method() {
-            self.execute_code(method, code_attribute);
+            return Ok((method, code_attribute));
         } else {
             return Err("Class File doesn't contain main method".to_string());
         }
-
-        return Ok(());
     }
 
-    pub fn execute_code(&self, method: &MethodInfo, code_data: CodeAttribute) {
+    pub fn execute_code(&self, _method: &MethodInfo, code_data: CodeAttribute) {
         let mut bytes = code_data.code;
 
-        let mut java_objects: Vec<String> = vec![];
+        let mut static_classes: HashMap<String, Box<dyn JavaClass>> = HashMap::new();
+        let mut java_objects: Vec<Box<dyn JavaClass>> = vec![];
         let mut operand_stack: Vec<StackValue> = vec![];
         let mut frame = vec![StackValue::default(); code_data.max_locals as usize];
+
+        fn debug_memory(
+            operand_stack: &Vec<StackValue>,
+            frame: &Vec<StackValue>,
+            java_objects: &Vec<Box<dyn JavaClass>>,
+            static_classes: &HashMap<String, Box<dyn JavaClass>>,
+        ) {
+            println!("==================\nCurrent JVM Memory:");
+            println!("Operand Stack: {:#?}\n", operand_stack);
+            println!("Current Frame: {:#?}\n", frame);
+            println!("Java Object Size: {}", java_objects.len());
+            println!("Java Static Classes: {:#?}", static_classes.keys());
+        }
 
         while bytes.len() > 0 {
             let opcode_byte = read_u1(&mut bytes);
@@ -91,29 +97,36 @@ impl JVM {
                         .unwrap()
                         .data
                         .clone();
-                    let name_type_name = self
+                    let _name_type_name = self
                         .class_file
                         .constant_pool
                         .get_utf8_at(name_type.name_index)
                         .unwrap()
                         .data
                         .clone();
-                    let descriptor = self
+                    let _descriptor = self
                         .class_file
                         .constant_pool
                         .get_utf8_at(name_type.descriptor_index)
                         .unwrap()
                         .data
                         .clone();
+
+                    #[cfg(feature = "debug")]
                     println!(
                         "[OpCodes : getstatic] Initialize new: {:#?}",
                         (&class_name, &name_type_name, &descriptor)
                     );
 
-                    operand_stack.push(StackValue::JavaObjectRef(JavaObjectRef {
-                        index: 255,
-                        class_name: class_name,
-                    }));
+                    if !static_classes.contains_key(&class_name) {
+                        let class = get_class_constructor(&class_name)(JavaClassInitContext {});
+                        static_classes.insert(String::from(&class_name), class);
+                    }
+
+                    if let Some(_) = static_classes.get(&class_name) {
+                        operand_stack
+                            .push(StackValue::JavaStaticClassRef(String::from(&class_name)));
+                    }
                 }
 
                 OpCodes::ldc => {
@@ -146,6 +159,44 @@ impl JVM {
                 }
 
                 OpCodes::invokespecial => {
+                    let index = read_u2(&mut bytes);
+
+                    let (_refs, class, name_type) = self
+                        .class_file
+                        .constant_pool
+                        .get_refs_ext_at(index)
+                        .unwrap();
+
+                    let _class_name = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(class.name_index)
+                        .unwrap()
+                        .data
+                        .clone();
+
+                    let _name_type_name = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(name_type.name_index)
+                        .unwrap()
+                        .data
+                        .clone();
+                    let descriptor = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(name_type.descriptor_index)
+                        .unwrap()
+                        .data
+                        .clone();
+
+                    let _descriptor = parse_descriptor(&descriptor);
+
+                    #[cfg(feature = "debug")]
+                    println!(
+                        "[OpCodes : invokespecial] Invoking {:#?}",
+                        (&class_name, &name_type_name, &descriptor)
+                    );
                     todo!("OpCode invokespecial")
                 }
 
@@ -163,23 +214,32 @@ impl JVM {
                     let index = read_u2(&mut bytes);
 
                     let class = self.class_file.constant_pool.get_class_at(index).unwrap();
-
                     let class_name = self
                         .class_file
                         .constant_pool
                         .get_utf8_at(class.name_index)
-                        .unwrap();
+                        .unwrap()
+                        .data
+                        .clone();
 
+                    #[cfg(feature = "debug")]
                     println!(
                         "[OpCodes : new] Initialize new class: {:#?}",
-                        (class, class_name.data.clone())
-                    )
+                        (&class, &class_name)
+                    );
 
-                    // todo!("OpCode new")
+                    let java_class = get_class_constructor(&class_name)(JavaClassInitContext {});
+                    java_objects.push(java_class);
+
+                    operand_stack.push(StackValue::JavaObjectRef(JavaObjectRef {
+                        index: java_objects.len() - 1,
+                    }));
                 }
 
                 OpCodes::dup => {
                     let last_element = operand_stack.last().unwrap().clone();
+                    #[cfg(feature = "debug")]
+                    println!("[OpCodes : dup] Duplicate {:#?}", last_element);
                     operand_stack.push(last_element);
                 }
 

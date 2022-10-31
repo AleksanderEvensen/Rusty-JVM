@@ -1,4 +1,4 @@
-use crate::jvm::{DebugLevel, JVM};
+use crate::jvm::JVM;
 use clap::Parser;
 use jvm_parser::{self, ClassFile};
 use std::path::PathBuf;
@@ -28,12 +28,22 @@ fn main() {
 
     let class_file = ClassFile::from_file(file_path).unwrap();
 
-    let mut jvm = JVM::new(class_file);
+    #[cfg(feature = "debug")]
+    {
+        println!(
+            "Magic: {:X?}\nVersion: {} : {}",
+            &class_file.magic, &class_file.major_version, &class_file.minor_version
+        );
+        class_file
+            .constant_pool
+            .0
+            .iter()
+            .enumerate()
+            .for_each(|(i, cp_info)| println!("[{}] cp_info = {:?}", i + 1, cp_info));
+    }
 
-    jvm.set_debug_level(if args.debug {
-        DebugLevel::Debug
-    } else {
-        DebugLevel::None
-    });
-    jvm.run_main().unwrap();
+    let jvm = JVM::new(class_file);
+
+    let (method, code) = jvm.get_main().unwrap();
+    jvm.execute_code(method, code);
 }
