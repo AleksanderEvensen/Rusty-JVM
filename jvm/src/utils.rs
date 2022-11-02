@@ -1,5 +1,7 @@
 use std::str::Chars;
 
+use crate::jvm::traits::JavaClass;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum DescriptorTypes {
     Void,
@@ -12,7 +14,21 @@ pub enum DescriptorTypes {
     Short,
     Boolean,
     Class(String),
-    Array(String, u16),
+    Array(Box<DescriptorTypes>, u16),
+}
+
+pub enum DescriptorValues {
+    Void,
+    Byte(u8),
+    Char(char),
+    Double(f64),
+    Float(f32),
+    Int(i32),
+    Long(i64),
+    Short(i16),
+    Boolean(bool),
+    Class(Box<dyn JavaClass>),
+    Array(Vec<DescriptorValues>, u16),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -39,9 +55,9 @@ pub fn parse_descriptor(descriptor: &String) -> DescriptorResult {
             'J' => DescriptorTypes::Long,
             'S' => DescriptorTypes::Short,
             'Z' => DescriptorTypes::Boolean,
-            'L' => DescriptorTypes::Class("".to_string()),
-            '[' => DescriptorTypes::Array("".to_string(), 0),
             'V' => DescriptorTypes::Void,
+            'L' => DescriptorTypes::Class("".to_string()),
+            '[' => DescriptorTypes::Array(Box::new(DescriptorTypes::Void), 0),
             _ => DescriptorTypes::Void,
         };
 
@@ -73,21 +89,52 @@ pub fn parse_descriptor(descriptor: &String) -> DescriptorResult {
 
 fn parse_array(iter: &mut Chars) -> DescriptorTypes {
     let mut array_dim = 1;
-    let mut array_type = String::new();
+    let mut array_type = Box::new(DescriptorTypes::Void);
 
     while let Some(value) = iter.next() {
         match value {
             '[' => array_dim += 1,
             'L' => {
-                if let DescriptorTypes::Class(class_type) = parse_class(iter) {
-                    array_type = class_type;
-                    break;
-                }
-            }
-            v => {
-                array_type.push(v);
+                array_type = Box::new(parse_class(iter));
                 break;
             }
+            'B' => {
+                array_type = Box::new(DescriptorTypes::Byte);
+                break;
+            }
+            'C' => {
+                array_type = Box::new(DescriptorTypes::Char);
+                break;
+            }
+            'D' => {
+                array_type = Box::new(DescriptorTypes::Boolean);
+                break;
+            }
+            'F' => {
+                array_type = Box::new(DescriptorTypes::Float);
+                break;
+            }
+            'I' => {
+                array_type = Box::new(DescriptorTypes::Int);
+                break;
+            }
+            'J' => {
+                array_type = Box::new(DescriptorTypes::Long);
+                break;
+            }
+            'S' => {
+                array_type = Box::new(DescriptorTypes::Short);
+                break;
+            }
+            'Z' => {
+                array_type = Box::new(DescriptorTypes::Boolean);
+                break;
+            }
+            'V' => {
+                array_type = Box::new(DescriptorTypes::Void);
+                break;
+            }
+            unknown => panic!("Un handled array type \"{}\"", value),
         }
     }
 
@@ -135,12 +182,12 @@ mod descriptor_tests {
     }
     #[test]
     fn parsing_class_bool_array() {
-        let class_bool_array = parse_descriptor(&"(Ljava/io/PrintStream;)[B".to_string());
+        let class_bool_array = parse_descriptor(&"(Ljava/io/PrintStream;)[Z".to_string());
 
         assert_eq!(
             class_bool_array,
             DescriptorResult {
-                return_value: DescriptorTypes::Array("B".to_string(), 1),
+                return_value: DescriptorTypes::Array(Box::new(DescriptorTypes::Boolean), 1),
                 parameters: vec![DescriptorTypes::Class("java/io/PrintStream".to_string())]
             }
         )
@@ -152,7 +199,7 @@ mod descriptor_tests {
         assert_eq!(
             multidim_array,
             DescriptorResult {
-                return_value: DescriptorTypes::Array("B".to_string(), 4),
+                return_value: DescriptorTypes::Array(Box::new(DescriptorTypes::Byte), 4),
                 parameters: vec![]
             }
         )

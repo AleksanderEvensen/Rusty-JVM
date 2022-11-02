@@ -1,8 +1,8 @@
-use crate::utils::{DescriptorResult, DescriptorTypes};
+use crate::utils::{DescriptorResult, DescriptorTypes, DescriptorValues};
 
 pub struct JavaClassInitContext {
     descriptor: DescriptorResult,
-    values: Vec<DescriptorTypes>,
+    values: Vec<DescriptorValues>,
 }
 
 impl JavaClassInitContext {
