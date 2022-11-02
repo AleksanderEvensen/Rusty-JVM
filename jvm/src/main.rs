@@ -7,6 +7,25 @@ pub mod java_mappings;
 mod jvm;
 pub mod utils;
 
+#[macro_export]
+#[cfg(feature = "debug")]
+macro_rules! dbgprint {
+    () => {
+        println!()
+    };
+
+	($($arg:tt)*) => {
+		println!($($arg)*)
+	}
+}
+
+#[macro_export]
+#[cfg(not(feature = "debug"))]
+macro_rules! dbgprint {
+    () => {};
+    ($($arg:tt)*) => {};
+}
+
 #[derive(Parser, Debug)]
 #[command(author,version,about,long_about = None)]
 struct Args {
@@ -28,18 +47,20 @@ fn main() {
 
     let class_file = ClassFile::from_file(file_path).unwrap();
 
+    dbgprint!(
+        "Magic: {:X?}\nVersion: {} : {}",
+        &class_file.magic,
+        &class_file.major_version,
+        &class_file.minor_version
+    );
     #[cfg(feature = "debug")]
     {
-        println!(
-            "Magic: {:X?}\nVersion: {} : {}",
-            &class_file.magic, &class_file.major_version, &class_file.minor_version
-        );
         class_file
             .constant_pool
             .0
             .iter()
             .enumerate()
-            .for_each(|(i, cp_info)| println!("[{}] cp_info = {:?}", i + 1, cp_info));
+            .for_each(|(i, cp_info)| dbgprint!("[{}] cp_info = {:?}", i + 1, cp_info));
     }
 
     let jvm = JVM::new(class_file);

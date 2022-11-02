@@ -1,6 +1,7 @@
 pub mod opcodes;
 pub mod traits;
 
+use crate::dbgprint;
 use std::collections::HashMap;
 
 use jvm_parser::{
@@ -112,8 +113,7 @@ impl JVM {
                         .data
                         .clone();
 
-                    #[cfg(feature = "debug")]
-                    println!(
+                    dbgprint!(
                         "[OpCodes : getstatic] Initialize new: {:#?}",
                         (&class_name, &_name_type_name, &_descriptor)
                     );
@@ -193,8 +193,7 @@ impl JVM {
 
                     let descriptor = parse_descriptor(&descriptor);
 
-                    #[cfg(feature = "debug")]
-                    println!(
+                    dbgprint!(
                         "[OpCodes : invokespecial] Invoking {:#?}",
                         (&class_name, &name_type_name, &descriptor)
                     );
@@ -230,8 +229,7 @@ impl JVM {
                         .data
                         .clone();
 
-                    #[cfg(feature = "debug")]
-                    println!(
+                    dbgprint!(
                         "[OpCodes : new] Initialize new class: {:#?}",
                         (&class, &class_name)
                     );
@@ -247,8 +245,7 @@ impl JVM {
 
                 OpCodes::dup => {
                     let last_element = operand_stack.last().unwrap().clone();
-                    #[cfg(feature = "debug")]
-                    println!("[OpCodes : dup] Duplicate {:#?}", last_element);
+                    dbgprint!("[OpCodes : dup] Duplicate {:#?}", last_element);
                     operand_stack.push(last_element);
                 }
 
