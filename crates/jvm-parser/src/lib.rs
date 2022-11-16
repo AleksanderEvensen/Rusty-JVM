@@ -40,7 +40,7 @@ impl ClassFile {
 
         // Read Constant Pool
         let constant_pool_count = read_u2(&mut bytes);
-        let mut constant_pool = ConstantPool::from_bytes(&mut bytes, &constant_pool_count);
+        class_file.constant_pool = ConstantPool::from_bytes(&mut bytes, &constant_pool_count);
 
         // class_file.access_flags =
         let valid_masks = parse_flags(
@@ -81,16 +81,19 @@ impl ClassFile {
         class_file.fields = vec![]; // TODO: implement field parsing
 
         let methods_count = read_u2(&mut bytes);
-        class_file.methods =
-            ClassFile::parse_methods(&mut bytes, &methods_count, &constant_pool.pool_entries);
+        class_file.methods = ClassFile::parse_methods(
+            &mut bytes,
+            &methods_count,
+            &class_file.constant_pool.pool_entries,
+        );
 
         let attributes_count = read_u2(&mut bytes);
-        class_file.attributes =
-            ClassFile::parse_attributes(&mut bytes, &attributes_count, &constant_pool.pool_entries);
+        class_file.attributes = ClassFile::parse_attributes(
+            &mut bytes,
+            &attributes_count,
+            &class_file.constant_pool.pool_entries,
+        );
 
-        ConstantPool::build_constant_pool(&mut constant_pool, &class_file);
-
-        class_file.constant_pool = constant_pool;
         Ok(class_file)
     }
 

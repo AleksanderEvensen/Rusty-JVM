@@ -40,14 +40,45 @@ pub struct JavaObjectRef {
 }
 
 pub struct JVM {
-    class_file: ClassFile,
+    // class_file: ClassFile,
+    class_files: HashMap<String, ClassFile>,
 }
 
 impl JVM {
-    pub fn new(class_file: ClassFile) -> Self {
-        Self { class_file }
+    pub fn new() -> Self {
+        Self {
+            class_files: HashMap::new(),
+        }
     }
 
+    pub fn add_class_file(&mut self, class_file: ClassFile) -> &mut Self {
+        println!("ClassFile: {:#?}", class_file);
+
+        let class = class_file
+            .constant_pool
+            .get_class_at(class_file.this_class)
+            .unwrap();
+        let class_name = class_file
+            .constant_pool
+            .get_utf8_at(class.name_index)
+            .unwrap()
+            .data
+            .clone();
+
+        self.class_files.insert(class_name, class_file);
+
+        println!("ClassName: {}", class_name);
+
+        self
+    }
+
+    pub fn run(&mut self) {
+        // self.class_files.iter().find(|class_file| {
+        //     // class_file.
+        // });
+    }
+
+    /*
     pub fn get_main(&self) -> Result<(&MethodInfo, CodeAttribute), String> {
         if let Some((method, code_attribute)) = self.class_file.get_main_method() {
             return Ok((method, code_attribute));
@@ -424,4 +455,6 @@ impl JVM {
             }
         }
     }
+
+    */
 }

@@ -1,10 +1,4 @@
-use std::sync::Arc;
-
-use crate::{
-    attributes::{AttributeInfo, BootstrapMethodsAttribute},
-    utils::{read_bytes, read_u1, read_u2, read_u4},
-    ClassFile, MethodInfo,
-};
+use crate::utils::{read_bytes, read_u1, read_u2, read_u4};
 
 #[derive(Debug, Default, Clone)]
 pub struct ConstantPool {
@@ -147,20 +141,6 @@ impl ConstantPool {
         pool
     }
 
-    pub fn build_constant_pool(pool: &mut ConstantPool, class_file: &ClassFile) {
-        pool.pool_entries.iter_mut().for_each(|entry| match entry {
-            CpInfo::Class(class) => class.build(pool),
-            CpInfo::InvokeDynamic(invoke_dyn) => invoke_dyn.build(pool),
-            CpInfo::MethodHandle(method_handle) => method_handle.build(pool),
-            CpInfo::NameAndType(name_and_type) => name_and_type.build(pool),
-            CpInfo::Refs(refs) => refs.build(pool),
-            CpInfo::String(string) => string.build(pool),
-            _ => {}
-        });
-
-        for entry in pool.pool_entries.iter_mut() {}
-    }
-
     pub fn get_at(&self, index: u16) -> &CpInfo {
         &self.pool_entries[index as usize - 1]
     }
@@ -265,13 +245,6 @@ pub struct CpInfoDouble {
 pub struct CpInfoClass {
     pub tag: String,
     pub name_index: u16,
-    pub name: Option<String>,
-}
-
-impl CpInfoClass {
-    pub fn build(&mut self, pool: &ConstantPool) {
-        self.name = Some(pool.get_utf8_at(self.name_index).unwrap().clone().data);
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -279,22 +252,6 @@ pub struct CpInfoRefs {
     pub tag: String,
     pub class_index: u16,
     pub name_and_type_index: u16,
-    pub class: Option<CpInfoClass>,
-    pub name_and_type: Option<CpInfoNameAndType>,
-}
-impl CpInfoRefs {
-    pub fn build(&mut self, pool: &ConstantPool) {
-        let class = pool.get_class_at(self.class_index).unwrap().clone();
-        class.build(pool);
-        let name_and_type = pool
-            .get_name_type_at(self.name_and_type_index)
-            .unwrap()
-            .clone();
-        name_and_type.build(pool);
-
-        self.class = Some(class);
-        self.name_and_type = Some(name_and_type);
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -302,19 +259,6 @@ pub struct CpInfoNameAndType {
     pub tag: String,
     pub name_index: u16,
     pub descriptor_index: u16,
-    pub name: Option<String>,
-    pub descriptor: Option<String>,
-}
-impl CpInfoNameAndType {
-    pub fn build(&mut self, pool: &ConstantPool) {
-        self.name = Some(pool.get_utf8_at(self.name_index).unwrap().data.clone());
-        self.descriptor = Some(
-            pool.get_utf8_at(self.descriptor_index)
-                .unwrap()
-                .data
-                .clone(),
-        );
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -326,12 +270,6 @@ pub struct CpInfoUtf8 {
 pub struct CpInfoString {
     pub tag: String,
     pub string_index: u16,
-    pub string: Option<String>,
-}
-impl CpInfoString {
-    pub fn build(&mut self, pool: &ConstantPool) {
-        self.string = Some(pool.get_utf8_at(self.string_index).unwrap().data.clone());
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -339,20 +277,6 @@ pub struct CpInfoInvokeDynamic {
     pub tag: String,
     pub bootstrap_method_attr_index: u16,
     pub name_and_type_index: u16,
-    pub bootstrap_method_attr: Option<BootstrapMethodsAttribute>,
-    pub name_and_type: Option<CpInfoNameAndType>,
-}
-
-impl CpInfoInvokeDynamic {
-    pub fn build(&mut self, pool: &ConstantPool) {
-        let name_and_type = pool
-            .get_name_type_at(self.name_and_type_index)
-            .unwrap()
-            .clone();
-        name_and_type.build(pool);
-
-        self.name_and_type = Some(name_and_type);
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -360,14 +284,4 @@ pub struct CpInfoMethodHandle {
     pub tag: String,
     pub reference_kind: u8,
     pub reference_index: u16,
-    pub reference: Option<CpInfoRefs>,
-}
-
-impl CpInfoMethodHandle {
-    pub fn build(&mut self, pool: &ConstantPool) {
-        let refs = pool.get_refs_at(self.reference_index).unwrap().clone();
-        refs.build(pool);
-
-        self.reference = Some(refs);
-    }
 }

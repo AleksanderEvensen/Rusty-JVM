@@ -1,14 +1,14 @@
-use crate::utils::{DescriptorResult, DescriptorTypes, DescriptorValues};
+use crate::utils::{Descriptor, DescriptorTypes, DescriptorValues};
 
 pub struct JavaClassInitContext {
-    descriptor: DescriptorResult,
+    descriptor: Descriptor,
     values: Vec<DescriptorValues>,
 }
 
 impl JavaClassInitContext {
     pub fn empty() -> Self {
         Self {
-            descriptor: DescriptorResult {
+            descriptor: Descriptor {
                 return_value: DescriptorTypes::Void,
                 parameters: vec![],
             },

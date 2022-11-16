@@ -32,12 +32,12 @@ pub enum DescriptorValues {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct DescriptorResult {
+pub struct Descriptor {
     pub return_value: DescriptorTypes,
     pub parameters: Vec<DescriptorTypes>,
 }
 
-pub fn parse_descriptor(descriptor: &String) -> DescriptorResult {
+pub fn parse_descriptor(descriptor: &String) -> Descriptor {
     let mut chars = descriptor.chars().into_iter();
 
     let mut parameters = vec![];
@@ -81,7 +81,7 @@ pub fn parse_descriptor(descriptor: &String) -> DescriptorResult {
         }
     }
 
-    DescriptorResult {
+    Descriptor {
         return_value,
         parameters,
     }
@@ -134,7 +134,7 @@ fn parse_array(iter: &mut Chars) -> DescriptorTypes {
                 array_type = Box::new(DescriptorTypes::Void);
                 break;
             }
-            unknown => panic!("Un handled array type \"{}\"", value),
+            _ => panic!("Un handled array type \"{}\"", value),
         }
     }
 
@@ -156,14 +156,14 @@ fn parse_class(iter: &mut Chars) -> DescriptorTypes {
 
 #[cfg(test)]
 mod descriptor_tests {
-    use super::{parse_descriptor, DescriptorResult, DescriptorTypes};
+    use super::{parse_descriptor, Descriptor, DescriptorTypes};
 
     #[test]
     fn parsing_byte_void() {
         let byte_void = parse_descriptor(&"(B)V".to_string());
         assert_eq!(
             byte_void,
-            DescriptorResult {
+            Descriptor {
                 return_value: DescriptorTypes::Void,
                 parameters: vec![DescriptorTypes::Byte]
             }
@@ -174,7 +174,7 @@ mod descriptor_tests {
         let char_bool = parse_descriptor(&"(C)Z".to_string());
         assert_eq!(
             char_bool,
-            DescriptorResult {
+            Descriptor {
                 return_value: DescriptorTypes::Boolean,
                 parameters: vec![DescriptorTypes::Char]
             }
@@ -186,7 +186,7 @@ mod descriptor_tests {
 
         assert_eq!(
             class_bool_array,
-            DescriptorResult {
+            Descriptor {
                 return_value: DescriptorTypes::Array(Box::new(DescriptorTypes::Boolean), 1),
                 parameters: vec![DescriptorTypes::Class("java/io/PrintStream".to_string())]
             }
@@ -198,7 +198,7 @@ mod descriptor_tests {
         let multidim_array = parse_descriptor(&"()[[[[B".to_string());
         assert_eq!(
             multidim_array,
-            DescriptorResult {
+            Descriptor {
                 return_value: DescriptorTypes::Array(Box::new(DescriptorTypes::Byte), 4),
                 parameters: vec![]
             }

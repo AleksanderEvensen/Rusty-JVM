@@ -3,6 +3,7 @@ use clap::Parser;
 use jvm_parser::{self, ClassFile};
 use std::path::PathBuf;
 
+mod class;
 pub mod java_mappings;
 mod jvm;
 pub mod utils;
@@ -57,15 +58,17 @@ fn main() {
     {
         class_file
             .constant_pool
-            .0
+            .pool_entries
             .iter()
             .enumerate()
             .for_each(|(i, cp_info)| dbgprint!("[{}] cp_info = {:?}", i + 1, cp_info));
     }
 
-    // println!("{:#?}", class_file);
+    let mut jvm = JVM::new();
 
-    // let jvm = JVM::new(class_file);
+    jvm.add_class_file(class_file);
+
+    jvm.run().unwrap();
 
     // let (method, code) = jvm.get_main().unwrap();
     // jvm.execute_code(method, code);
