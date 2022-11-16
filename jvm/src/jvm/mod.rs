@@ -64,22 +64,59 @@ impl JVM {
         let mut operand_stack: Vec<StackValue> = vec![];
         let mut frame = vec![StackValue::default(); code_data.max_locals as usize];
 
+        #[allow(unused)]
         fn debug_memory(
             operand_stack: &Vec<StackValue>,
             frame: &Vec<StackValue>,
             java_objects: &Vec<Box<dyn JavaClass>>,
             static_classes: &HashMap<String, Box<dyn JavaClass>>,
         ) {
-            println!("==================\nCurrent JVM Memory:");
-            println!("Operand Stack: {:#?}\n", operand_stack);
-            println!("Current Frame: {:#?}\n", frame);
-            println!("Java Object Size: {}", java_objects.len());
-            println!("Java Static Classes: {:#?}", static_classes.keys());
+            dbgprint!("==================\nCurrent JVM Memory:");
+            dbgprint!("Operand Stack: {:#?}\n", operand_stack);
+            dbgprint!("Current Frame: {:#?}\n", frame);
+            dbgprint!("Java Object Size: {}", java_objects.len());
+            dbgprint!("Java Static Classes: {:#?}", static_classes.keys());
+        }
+
+        #[allow(unused)]
+        fn debug_bytecode(bytecode: &Vec<u8>) {
+            dbgprint!("===========================\nCurrent Remaining bytecode:");
+            dbgprint!("Byte Code Bytes: {:?}", &bytecode);
+            dbgprint!("With potential opcodes:");
+
+            let mut iter = bytecode.iter();
+
+            while let Some(v) = iter.next() {
+                let opcode = OpCodes::from(*v);
+                match opcode {
+                    OpCodes::getstatic => {
+                        let index =
+                            u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
+                        println!("  {:?}({})", opcode, index);
+                    }
+                    OpCodes::ldc => {
+                        let index = u8::from_be_bytes([*iter.next().unwrap()]);
+                        println!("  {:?}({})", opcode, index);
+                    }
+
+                    OpCodes::invokevirtual => {
+                        let index =
+                            u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
+                        println!("  {:?}({})", opcode, index);
+                    }
+
+                    v => println!("  {:?}", v),
+                }
+            }
+            println!();
         }
 
         while bytes.len() > 0 {
+            // debug_bytecode(&bytes);
             let opcode_byte = read_u1(&mut bytes);
             let opcode = OpCodes::from(opcode_byte);
+
+            dbgprint!("[Executing Opcode : {:?}]", opcode);
 
             match opcode {
                 OpCodes::getstatic => {
@@ -131,8 +168,8 @@ impl JVM {
                 }
 
                 OpCodes::ldc => {
-                    let index = read_u2(&mut bytes);
-                    let value = match &self.class_file.constant_pool.get_at(index) {
+                    let index = read_u1(&mut bytes);
+                    let value = match &self.class_file.constant_pool.get_at(index as u16) {
                         CpInfo::String(str) => {
                             let text = self
                                 .class_file
@@ -152,10 +189,42 @@ impl JVM {
                             panic!("[OpCode : LDC] The value at index ( {} ) in the constant_pool, does not have an implementation on the operand stack. Constant pool value: {:#?}", index, unimplemented_type);
                         }
                     };
+
+                    dbgprint!("[OpCode : LDC] Adding value to operand_stack: {:?}", value);
                     operand_stack.push(value);
                 }
 
                 OpCodes::invokevirtual => {
+                    let index = read_u2(&mut bytes);
+                    let (_, class, name_type) = self
+                        .class_file
+                        .constant_pool
+                        .get_refs_ext_at(index)
+                        .unwrap();
+
+                    let class_name = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(class.name_index)
+                        .unwrap();
+                    let name_type_name = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(name_type.name_index)
+                        .unwrap();
+                    let descriptor = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(name_type.descriptor_index)
+                        .unwrap();
+
+                    dbgprint!(
+                        "[OpCode : invokevirtual] Invoking: {:#?}",
+                        (&class_name.data, &name_type_name.data, &descriptor.data)
+                    );
+
+                    dbgprint!("Operand Stack: {:#?}", operand_stack);
+
                     todo!("OpCode invokevirtual")
                 }
 
@@ -205,6 +274,45 @@ impl JVM {
                     }
 
                     todo!("OpCode invokespecial")
+                }
+
+                OpCodes::invokestatic => {
+                    let index = read_u2(&mut bytes);
+
+                    let (_, class, name_type) = self
+                        .class_file
+                        .constant_pool
+                        .get_refs_ext_at(index)
+                        .unwrap();
+                    let class_name = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(class.name_index)
+                        .unwrap()
+                        .data
+                        .clone();
+
+                    let name_type_name = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(name_type.name_index)
+                        .unwrap()
+                        .data
+                        .clone();
+                    let descriptor = self
+                        .class_file
+                        .constant_pool
+                        .get_utf8_at(name_type.descriptor_index)
+                        .unwrap()
+                        .data
+                        .clone();
+
+                    let descriptor = parse_descriptor(&descriptor);
+
+                    dbgprint!(
+                        "[OpCodes : invokestatic] Invoking {:#?}",
+                        (&class_name, &name_type_name, &descriptor)
+                    );
                 }
 
                 OpCodes::bipush => {
@@ -300,8 +408,7 @@ impl JVM {
                 OpCodes::Return | OpCodes::nop => {}
 
                 // Handle the opcodes that ins't implemented
-                OpCodes::OpCodeError => {
-                    println!("Remaining byte code: {:?}", bytes);
+                OpCodes::OpCodeError(_) => {
                     panic!(
                         "The OpCode ( {} ), is not implemented or doesn't exist",
                         opcode_byte

@@ -63,8 +63,10 @@ fn main() {
             .for_each(|(i, cp_info)| dbgprint!("[{}] cp_info = {:?}", i + 1, cp_info));
     }
 
-    let jvm = JVM::new(class_file);
+    // println!("{:#?}", class_file);
 
-    let (method, code) = jvm.get_main().unwrap();
-    jvm.execute_code(method, code);
+    // let jvm = JVM::new(class_file);
+
+    // let (method, code) = jvm.get_main().unwrap();
+    // jvm.execute_code(method, code);
 }

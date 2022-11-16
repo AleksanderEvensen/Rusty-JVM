@@ -1,13 +1,14 @@
 #[allow(non_camel_case_types)]
 #[derive(Debug)]
 pub enum OpCodes {
-    OpCodeError,
+    OpCodeError(u8),
     nop,
     dup,
     getstatic,
     ldc,
     invokevirtual,
     invokespecial,
+    invokestatic,
     bipush,
     sipush,
 
@@ -34,6 +35,7 @@ impl From<u8> for OpCodes {
             0x12 => OpCodes::ldc,
             0xb6 => OpCodes::invokevirtual,
             0xb7 => OpCodes::invokespecial,
+            0xb8 => OpCodes::invokestatic,
             0x10 => OpCodes::bipush,
             0x11 => OpCodes::sipush,
 
@@ -72,7 +74,7 @@ impl From<u8> for OpCodes {
             0x25 => OpCodes::fload_(3),
 
             0xb1 => OpCodes::Return,
-            _ => OpCodes::OpCodeError,
+            _ => OpCodes::OpCodeError(v),
         }
     }
 }
