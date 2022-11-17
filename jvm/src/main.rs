@@ -3,8 +3,6 @@ use clap::Parser;
 use jvm_parser::{self, ClassFile};
 use std::path::PathBuf;
 
-mod class;
-pub mod java_mappings;
 mod jvm;
 pub mod utils;
 
@@ -46,7 +44,8 @@ fn main() {
         .or_else(|| Some("./java/MyProgram.class".into()))
         .unwrap();
 
-    let class_file = ClassFile::from_file(file_path).unwrap();
+    let class_file = ClassFile::from_file(&file_path).unwrap();
+    let class_file_2 = ClassFile::from_file(&file_path).unwrap();
 
     dbgprint!(
         "Magic: {:X?}\nVersion: {} : {}",
@@ -65,11 +64,6 @@ fn main() {
     }
 
     let mut jvm = JVM::new();
-
-    jvm.add_class_file(class_file);
-
-    jvm.run().unwrap();
-
-    // let (method, code) = jvm.get_main().unwrap();
-    // jvm.execute_code(method, code);
+    jvm.add_class_file(class_file).add_class_file(class_file_2);
+    jvm.run();
 }

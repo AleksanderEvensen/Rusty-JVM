@@ -11,7 +11,7 @@ use std::{error::Error, path::PathBuf};
 use utils::{read_bytes, read_u2, read_u4};
 
 // From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.1
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ClassFile {
     pub magic: u32,
     pub minor_version: u16,
@@ -27,120 +27,76 @@ pub struct ClassFile {
 }
 
 impl ClassFile {
-    pub fn from_file(path: PathBuf) -> Result<ClassFile, Box<dyn Error>> {
+    pub fn from_file(path: &PathBuf) -> Result<ClassFile, Box<dyn Error>> {
         ClassFile::from_bytes(std::fs::read(path)?)
     }
     pub fn from_bytes(mut bytes: Vec<u8>) -> Result<ClassFile, Box<dyn Error>> {
-        let mut class_file = ClassFile {
+        let mut class = ClassFile {
             magic: read_u4(&mut bytes),
             minor_version: read_u2(&mut bytes),
             major_version: read_u2(&mut bytes),
-            ..Default::default()
+            constant_pool: ConstantPool::from_bytes(&mut bytes),
+            access_flags: AccessFlags {
+                flags: parse_flags(
+                    read_u2(&mut bytes),
+                    vec![
+                        (0x001, "ACC_PUBLIC".to_string()),
+                        (0x0010, "ACC_FINAL".to_string()),
+                        (0x0020, "ACC_SUPER".to_string()),
+                        (0x0020, "ACC_INTERFACE".to_string()),
+                        (0x0040, "ACC_ABSTRACT".to_string()),
+                        (0x1000, "ACC_SYNTHETIC".to_string()),
+                        (0x2000, "ACC_ANNOTATION".to_string()),
+                        (0x4000, "ACC_ENUM".to_string()),
+                    ],
+                ),
+            },
+            this_class: read_u2(&mut bytes),
+            super_class: read_u2(&mut bytes),
+            interfaces: Vec::with_capacity(read_u2(&mut bytes) as usize), // TODO: Implement interface parsing from bytes
+            fields: Vec::with_capacity(read_u2(&mut bytes) as usize), // TODO: Implement field parsing from bytes
+            methods: vec![],
+            attributes: vec![],
         };
 
-        // Read Constant Pool
-        let constant_pool_count = read_u2(&mut bytes);
-        class_file.constant_pool = ConstantPool::from_bytes(&mut bytes, &constant_pool_count);
+        class.methods = ClassFile::parse_methods(&mut bytes, &class.constant_pool.pool_entries);
 
-        // class_file.access_flags =
-        let valid_masks = parse_flags(
-            read_u2(&mut bytes),
-            vec![
-                0x001, 0x0010, 0x0020, 0x0200, 0x0400, 0x1000, 0x2000, 0x4000,
-            ],
-        );
+        class.attributes =
+            ClassFile::parse_attributes(&mut bytes, &class.constant_pool.pool_entries);
 
-        class_file.access_flags = AccessFlags {
-            byte_flags: valid_masks.clone(),
-            flags: vec![
-                ("ACC_PUBLIC".to_string(), 0x0001),
-                ("ACC_FINAL".to_string(), 0x0010),
-                ("ACC_SUPER".to_string(), 0x0020),
-                ("ACC_INTERFACE".to_string(), 0x0200),
-                ("ACC_ABSTRACT".to_string(), 0x0400),
-                ("ACC_SYNTHETIC".to_string(), 0x1000),
-                ("ACC_ANNOTATION".to_string(), 0x2000),
-                ("ACC_ENUM".to_string(), 0x4000),
-            ]
-            .iter()
-            .filter(|flag| valid_masks.contains(&flag.1))
-            .map(|flag| flag.0.clone())
-            .collect::<Vec<String>>(),
-        };
-
-        class_file.this_class = read_u2(&mut bytes);
-        class_file.super_class = read_u2(&mut bytes);
-
-        #[allow(unused_variables)] // TODO: Remove this when implemented
-        let interfaces_count = read_u2(&mut bytes);
-
-        class_file.interfaces = vec![]; // TODO: implement interface parsing
-
-        #[allow(unused_variables)] // TODO: Remove this when implemented
-        let fields_count = read_u2(&mut bytes);
-        class_file.fields = vec![]; // TODO: implement field parsing
-
-        let methods_count = read_u2(&mut bytes);
-        class_file.methods = ClassFile::parse_methods(
-            &mut bytes,
-            &methods_count,
-            &class_file.constant_pool.pool_entries,
-        );
-
-        let attributes_count = read_u2(&mut bytes);
-        class_file.attributes = ClassFile::parse_attributes(
-            &mut bytes,
-            &attributes_count,
-            &class_file.constant_pool.pool_entries,
-        );
-
-        Ok(class_file)
+        Ok(class)
     }
 
-    pub fn parse_methods(
-        bytes: &mut Vec<u8>,
-        method_count: &u16,
-        constant_pool: &Vec<CpInfo>,
-    ) -> Vec<MethodInfo> {
+    pub fn parse_methods(bytes: &mut Vec<u8>, constant_pool: &Vec<CpInfo>) -> Vec<MethodInfo> {
+        let method_count = read_u2(bytes);
         let mut methods = vec![];
 
-        for _ in 0..*method_count as usize {
-            let valid_masks = parse_flags(
+        for _ in 0..method_count as usize {
+            let flags = parse_flags(
                 read_u2(bytes),
                 vec![
-                    0x0001, 0x0002, 0x0004, 0x0008, 0x0010, 0x0020, 0x0040, 0x0080, 0x0100, 0x0400,
-                    0x0800, 0x1000,
+                    (0x0001, "ACC_PUBLIC".to_string()),
+                    (0x0002, "ACC_PRIVATE".to_string()),
+                    (0x0004, "ACC_PROTECTED".to_string()),
+                    (0x0008, "ACC_STATIC".to_string()),
+                    (0x0010, "ACC_FINAL".to_string()),
+                    (0x0020, "ACC_SYNCHRONIZED".to_string()),
+                    (0x0040, "ACC_BRIDGE".to_string()),
+                    (0x0080, "ACC_VARARGS".to_string()),
+                    (0x0100, "ACC_NATIVE".to_string()),
+                    (0x0400, "ACC_ABSTRACT".to_string()),
+                    (0x0800, "ACC_STRICT".to_string()),
+                    (0x1000, "ACC_SYNTHETIC".to_string()),
                 ],
             );
             let mut method = MethodInfo {
-                access_flags: AccessFlags {
-                    byte_flags: valid_masks.clone(),
-                    flags: vec![
-                        ("ACC_PUBLIC".to_string(), 0x0001),
-                        ("ACC_PRIVATE".to_string(), 0x0002),
-                        ("ACC_PROTECTED".to_string(), 0x0004),
-                        ("ACC_STATIC".to_string(), 0x0008),
-                        ("ACC_FINAL".to_string(), 0x0010),
-                        ("ACC_SYNCHRONIZED".to_string(), 0x0020),
-                        ("ACC_BRIDGE".to_string(), 0x0040),
-                        ("ACC_VARARGS".to_string(), 0x0080),
-                        ("ACC_NATIVE".to_string(), 0x0100),
-                        ("ACC_ABSTRACT".to_string(), 0x0400),
-                        ("ACC_STRICT".to_string(), 0x0800),
-                        ("ACC_SYNTHETIC".to_string(), 0x1000),
-                    ]
-                    .iter()
-                    .filter(|flag| valid_masks.contains(&flag.1))
-                    .map(|flag| flag.0.clone())
-                    .collect::<Vec<String>>(),
-                },
+                access_flags: AccessFlags { flags },
                 name_index: read_u2(bytes),
                 descriptor_index: read_u2(bytes),
                 attributes_count: read_u2(bytes),
                 attributes: vec![],
             };
-            method.attributes =
-                ClassFile::parse_attributes(bytes, &method.attributes_count, constant_pool);
+            method.attributes = ClassFile::parse_attributes(bytes, constant_pool);
             methods.push(method);
         }
 
@@ -149,9 +105,9 @@ impl ClassFile {
 
     pub fn parse_attributes(
         bytes: &mut Vec<u8>,
-        attribute_count: &u16,
         constant_pool: &Vec<CpInfo>,
     ) -> Vec<AttributeInfo> {
+        let attribute_count = read_u2(bytes);
         let mut attributes = vec![];
 
         for _ in 0..attribute_count.to_owned() as usize {
@@ -178,9 +134,7 @@ impl ClassFile {
                             });
                         }
 
-                        let attribute_count = read_u2(bytes);
-                        let attribute_info =
-                            ClassFile::parse_attributes(bytes, &attribute_count, constant_pool);
+                        let attribute_info = ClassFile::parse_attributes(bytes, constant_pool);
 
                         AttributeInfoData::Code(CodeAttribute {
                             max_stack,
@@ -264,44 +218,12 @@ impl ClassFile {
         attributes
     }
 }
-
-impl ClassFile {
-    pub fn get_main_method(&self) -> Option<(&MethodInfo, CodeAttribute)> {
-        if let Some(method) = self.methods.iter().find(|&v| {
-            if let Some(name) = &self.constant_pool.get_utf8_at(v.name_index) {
-                if name.data.as_str() == "main" {
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        }) {
-            let mut code: Option<CodeAttribute> = None;
-
-            for attribute in method.attributes.iter() {
-                if let AttributeInfoData::Code(data) = &attribute.attribute {
-                    code = Some(data.clone())
-                }
-            }
-
-            let code = code.unwrap();
-
-            return Some((method, code));
-        }
-
-        None
-    }
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct AccessFlags {
     pub flags: Vec<String>,
-    pub byte_flags: Vec<u16>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct MethodInfo {
     pub access_flags: AccessFlags,
     pub name_index: u16,
@@ -310,23 +232,21 @@ pub struct MethodInfo {
     pub attributes: Vec<AttributeInfo>,
 }
 
-fn parse_flags(value: u16, masks: Vec<u16>) -> Vec<u16> {
-    let mut valid_masks = vec![];
-    for mask in masks.iter() {
-        if (value & mask.to_owned()) != 0 {
-            valid_masks.push(mask.clone())
+fn parse_flags<T>(value: u16, masks: Vec<(u16, T)>) -> Vec<T> {
+    let mut matching_flags = vec![];
+    for mask in masks {
+        if (value & mask.0.to_owned()) != 0 {
+            matching_flags.push(mask.1);
         }
     }
-    valid_masks
+    return matching_flags;
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub enum Interfaces {
-    #[default]
     V,
 }
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub enum FieldInfo {
-    #[default]
     V,
 }

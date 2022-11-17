@@ -1,23 +1,10 @@
 pub mod opcodes;
-pub mod traits;
 
+#[allow(unused)]
 use crate::dbgprint;
 use std::collections::HashMap;
 
-use jvm_parser::{
-    attributes::CodeAttribute,
-    constant_pool::CpInfo,
-    utils::{read_u1, read_u2},
-    ClassFile, MethodInfo,
-};
-use opcodes::OpCodes;
-
-use crate::{
-    java_mappings::get_class_constructor, jvm::traits::JavaClassInitContext,
-    utils::parse_descriptor,
-};
-
-use self::traits::JavaClass;
+use jvm_parser::ClassFile;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
@@ -54,20 +41,20 @@ impl JVM {
     pub fn add_class_file(&mut self, class_file: ClassFile) -> &mut Self {
         println!("ClassFile: {:#?}", class_file);
 
-        let class = class_file
-            .constant_pool
-            .get_class_at(class_file.this_class)
-            .unwrap();
-        let class_name = class_file
-            .constant_pool
-            .get_utf8_at(class.name_index)
-            .unwrap()
-            .data
-            .clone();
+        // let class = class_file
+        //     .constant_pool
+        //     .get_class_at(class_file.this_class)
+        //     .unwrap();
+        // let class_name = class_file
+        //     .constant_pool
+        //     .get_utf8_at(class.name_index)
+        //     .unwrap()
+        //     .data
+        //     .clone();
 
-        self.class_files.insert(class_name, class_file);
+        // self.class_files.insert(class_name, class_file);
 
-        println!("ClassName: {}", class_name);
+        // println!("ClassName: {}", class_name);
 
         self
     }

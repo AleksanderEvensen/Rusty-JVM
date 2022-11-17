@@ -8,8 +8,6 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.0.18", features = ["derive"] }
 jvm_parser = { path = "../crates/jvm-parser" }
-macros = { path = "../crates/macros" }
-
 
 [features]
 debug = []

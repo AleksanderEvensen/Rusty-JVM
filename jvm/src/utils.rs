@@ -1,7 +1,4 @@
 use std::str::Chars;
-
-use crate::jvm::traits::JavaClass;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum DescriptorTypes {
     Void,
@@ -27,7 +24,7 @@ pub enum DescriptorValues {
     Long(i64),
     Short(i16),
     Boolean(bool),
-    Class(Box<dyn JavaClass>),
+    Class(String),
     Array(Vec<DescriptorValues>, u16),
 }
 

@@ -1,49 +1,43 @@
 use crate::utils::{read_bytes, read_u1, read_u2, read_u4};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct ConstantPool {
     pub pool_entries: Vec<CpInfo>,
 }
 
 impl ConstantPool {
-    pub fn from_bytes(bytes: &mut Vec<u8>, pool_count: &u16) -> Self {
-        let mut pool = ConstantPool {
-            pool_entries: vec![],
-        };
+    pub fn from_bytes(bytes: &mut Vec<u8>) -> Self {
+        let pool_count = read_u2(bytes);
+        let mut pool: Vec<CpInfo> = vec![];
 
         for _ in 0..(pool_count - 1) {
             let cp_info = match read_u1(bytes) {
                 7 => CpInfo::Class(CpInfoClass {
                     tag: "CONSTANT_Class".to_string(),
                     name_index: read_u2(bytes),
-                    ..Default::default()
                 }),
 
                 9 => CpInfo::Refs(CpInfoRefs {
                     tag: "CONSTANT_FieldRef".to_string(),
                     class_index: read_u2(bytes),
                     name_and_type_index: read_u2(bytes),
-                    ..Default::default()
                 }),
 
                 10 => CpInfo::Refs(CpInfoRefs {
                     tag: "CONSTANT_MethodRef".to_string(),
                     class_index: read_u2(bytes),
                     name_and_type_index: read_u2(bytes),
-                    ..Default::default()
                 }),
 
                 11 => CpInfo::Refs(CpInfoRefs {
                     tag: "CONSTANT_InterfaceMethodref".to_string(),
                     class_index: read_u2(bytes),
                     name_and_type_index: read_u2(bytes),
-                    ..Default::default()
                 }),
 
                 8 => CpInfo::String(CpInfoString {
                     tag: "CONSTANT_String".to_string(),
                     string_index: read_u2(bytes),
-                    ..Default::default()
                 }),
 
                 3 => {
@@ -99,7 +93,6 @@ impl ConstantPool {
                     tag: "CONSTANT_NameAndType".to_string(),
                     name_index: read_u2(bytes),
                     descriptor_index: read_u2(bytes),
-                    ..Default::default()
                 }),
 
                 1 => {
@@ -118,7 +111,6 @@ impl ConstantPool {
                     tag: "CONSTANT_MethodHandle".to_string(),
                     reference_kind: read_u1(bytes),
                     reference_index: read_u2(bytes),
-                    ..Default::default()
                 }),
 
                 16 => {
@@ -129,79 +121,59 @@ impl ConstantPool {
                     tag: "CONSTANT_InvokeDynamic".to_string(),
                     bootstrap_method_attr_index: read_u2(bytes),
                     name_and_type_index: read_u2(bytes),
-                    ..Default::default()
                 }),
                 unknown_tag => {
                     panic!("Unknown CONSTANT_TYPE: {}", unknown_tag)
                 }
             };
-            pool.pool_entries.push(cp_info);
+            pool.push(cp_info);
         }
-
-        pool
+        ConstantPool { pool_entries: pool }
     }
 
-    pub fn get_at(&self, index: u16) -> &CpInfo {
-        &self.pool_entries[index as usize - 1]
+    pub fn get_at(&self, index: u16) -> Option<&CpInfo> {
+        self.pool_entries.get(index as usize - 1)
     }
 
     pub fn get_class_at(&self, index: u16) -> Option<&CpInfoClass> {
-        if let CpInfo::Class(class) = &self.get_at(index) {
+        if let CpInfo::Class(class) = self.get_at(index).unwrap() {
             return Some(class);
         }
         None
     }
 
     pub fn get_refs_at(&self, index: u16) -> Option<&CpInfoRefs> {
-        if let CpInfo::Refs(refs) = &self.get_at(index) {
+        if let CpInfo::Refs(refs) = self.get_at(index).unwrap() {
             return Some(refs);
         }
         None
     }
 
     pub fn get_name_type_at(&self, index: u16) -> Option<&CpInfoNameAndType> {
-        if let CpInfo::NameAndType(name_type) = &self.get_at(index) {
+        if let CpInfo::NameAndType(name_type) = self.get_at(index).unwrap() {
             return Some(name_type);
         }
         None
     }
 
     pub fn get_utf8_at(&self, index: u16) -> Option<&CpInfoUtf8> {
-        if let CpInfo::Utf8(utf8) = &self.get_at(index) {
+        if let CpInfo::Utf8(utf8) = self.get_at(index).unwrap() {
             return Some(utf8);
         }
         None
     }
 
     pub fn get_string_at(&self, index: u16) -> Option<&CpInfoString> {
-        if let CpInfo::String(str) = &self.get_at(index) {
+        if let CpInfo::String(str) = self.get_at(index).unwrap() {
             return Some(str);
         }
         None
     }
-
-    pub fn get_refs_ext_at(
-        &self,
-        index: u16,
-    ) -> Option<(&CpInfoRefs, &CpInfoClass, &CpInfoNameAndType)> {
-        if let Some(refs) = self.get_refs_at(index) {
-            if let Some(class) = self.get_class_at(refs.class_index) {
-                if let Some(name_type) = self.get_name_type_at(refs.name_and_type_index) {
-                    return Some((refs, class, name_type));
-                }
-            }
-        }
-
-        return None;
-    }
 }
 
 // From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub enum CpInfo {
-    #[default]
-    None,
-
     Class(CpInfoClass),
     Refs(CpInfoRefs),
     NameAndType(CpInfoNameAndType),
@@ -215,25 +187,25 @@ pub enum CpInfo {
     MethodHandle(CpInfoMethodHandle),
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoInteger {
     pub tag: String,
     pub bytes: i32,
 }
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoFloat {
     pub tag: String,
     pub bytes: f32,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoLong {
     pub tag: String,
     pub high_bytes: u32,
     pub low_bytes: u32,
     pub bytes: u64,
 }
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoDouble {
     pub tag: String,
     pub high_bytes: u32,
@@ -241,45 +213,45 @@ pub struct CpInfoDouble {
     pub bytes: f64,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoClass {
     pub tag: String,
     pub name_index: u16,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoRefs {
     pub tag: String,
     pub class_index: u16,
     pub name_and_type_index: u16,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoNameAndType {
     pub tag: String,
     pub name_index: u16,
     pub descriptor_index: u16,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoUtf8 {
     pub tag: String,
     pub data: String,
 }
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoString {
     pub tag: String,
     pub string_index: u16,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoInvokeDynamic {
     pub tag: String,
     pub bootstrap_method_attr_index: u16,
     pub name_and_type_index: u16,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CpInfoMethodHandle {
     pub tag: String,
     pub reference_kind: u8,
