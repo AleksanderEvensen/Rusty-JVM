@@ -1,2 +1,5 @@
 /target
 .env
+/java/*.class
+/java/*.jar
+java-build-output.txt

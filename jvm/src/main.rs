@@ -1,10 +1,10 @@
-use crate::jvm::JVM;
+// use crate::jvm::JVM;
 use clap::Parser;
-use jvm_parser::{self, ClassFile};
+// use jvm_parser::{self, ClassFile};
 use std::path::PathBuf;
 
-mod jvm;
-pub mod utils;
+// mod jvm;
+// pub mod utils;
 
 #[macro_export]
 #[cfg(feature = "debug")]
@@ -37,22 +37,21 @@ struct Args {
 }
 
 fn main() {
-    let args = Args::parse();
+    // let args = Args::parse();
 
-    let file_path = args
-        .path
-        .or_else(|| Some("./java/MyProgram.class".into()))
-        .unwrap();
+    // let file_path = args
+    //     .path
+    //     .or_else(|| Some("./java/MyProgram.class".into()))
+    //     .unwrap();
 
-    let class_file = ClassFile::from_file(&file_path).unwrap();
-    let class_file_2 = ClassFile::from_file(&file_path).unwrap();
+    // let class_file = ClassFile::from_file(&file_path).unwrap();
 
-    dbgprint!(
-        "Magic: {:X?}\nVersion: {} : {}",
-        &class_file.magic,
-        &class_file.major_version,
-        &class_file.minor_version
-    );
+    // dbgprint!(
+    //     "Magic: {:X?}\nVersion: {} : {}",
+    //     &class_file.magic,
+    //     &class_file.major_version,
+    //     &class_file.minor_version
+    // );
     #[cfg(feature = "debug")]
     {
         class_file
@@ -63,7 +62,9 @@ fn main() {
             .for_each(|(i, cp_info)| dbgprint!("[{}] cp_info = {:?}", i + 1, cp_info));
     }
 
-    let mut jvm = JVM::new();
-    jvm.add_class_file(class_file).add_class_file(class_file_2);
-    jvm.run();
+    // let mut jvm = JVM::new();
+    // jvm.add_class_file(class_file).add_class_file(class_file_2);
+    // jvm.run();
+
+    // println!("{:#?}", class_file);
 }
