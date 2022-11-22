@@ -1,5 +1,6 @@
 // use crate::jvm::JVM;
 use clap::Parser;
+use jvm_parser::jar::JarFile;
 // use jvm_parser::{self, ClassFile};
 use std::path::PathBuf;
 
@@ -46,21 +47,23 @@ fn main() {
 
     // let class_file = ClassFile::from_file(&file_path).unwrap();
 
+    let jar_file = JarFile::from_file(&PathBuf::from("./java/jvm-test.jar")).unwrap();
+
     // dbgprint!(
     //     "Magic: {:X?}\nVersion: {} : {}",
     //     &class_file.magic,
     //     &class_file.major_version,
     //     &class_file.minor_version
     // );
-    #[cfg(feature = "debug")]
-    {
-        class_file
-            .constant_pool
-            .pool_entries
-            .iter()
-            .enumerate()
-            .for_each(|(i, cp_info)| dbgprint!("[{}] cp_info = {:?}", i + 1, cp_info));
-    }
+    // #[cfg(feature = "debug")]
+    // {
+    //     class_file
+    //         .constant_pool
+    //         .pool_entries
+    //         .iter()
+    //         .enumerate()
+    //         .for_each(|(i, cp_info)| dbgprint!("[{}] cp_info = {:?}", i + 1, cp_info));
+    // }
 
     // let mut jvm = JVM::new();
     // jvm.add_class_file(class_file).add_class_file(class_file_2);

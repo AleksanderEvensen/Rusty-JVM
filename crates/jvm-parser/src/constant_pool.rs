@@ -1,4 +1,4 @@
-use crate::utils::{read_bytes, read_u1, read_u2, read_u4};
+use crate::utils::big_endian::{read_bytes, read_u1, read_u2, read_u4};
 
 #[derive(Debug, Clone)]
 pub struct ConstantPool {
