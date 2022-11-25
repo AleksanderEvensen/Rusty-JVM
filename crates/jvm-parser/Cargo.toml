@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 binary_reader = { path="../binary_reader" }
+zip = "0.6.3"

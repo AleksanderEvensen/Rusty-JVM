@@ -68,6 +68,9 @@ impl BinaryReader {
         self.offset += jump_by;
         self
     }
+    pub fn get_current_offset(&self) -> usize {
+        self.offset
+    }
     pub fn read_bytes(&mut self, bytes: usize) -> std::io::Result<&[u8]> {
         let data = self
             .data
