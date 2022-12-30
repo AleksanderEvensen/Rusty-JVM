@@ -71,7 +71,7 @@ impl BinaryReader {
     pub fn get_current_offset(&self) -> usize {
         self.offset
     }
-    pub fn read_bytes(&mut self, bytes: usize) -> std::io::Result<&[u8]> {
+    pub fn read_bytes(&mut self, bytes: usize) -> std::io::Result<Vec<u8>> {
         let data = self
             .data
             .get(self.offset..self.offset + bytes)
@@ -82,9 +82,9 @@ impl BinaryReader {
                 )
             })?;
         self.offset += bytes;
-        Ok(data)
+        Ok(data.to_vec())
     }
-    pub fn peak_bytes(&self, bytes: usize) -> std::io::Result<&[u8]> {
+    pub fn peak_bytes(&self, bytes: usize) -> std::io::Result<Vec<u8>> {
         let data = self
             .data
             .get(self.offset..self.offset + bytes)
@@ -94,17 +94,17 @@ impl BinaryReader {
                     format!("failed to read {} bytes from offset {}", bytes, self.offset),
                 )
             })?;
-        Ok(data)
+        Ok(data.to_vec())
     }
 
-    pub fn find_next(&self, sequence: Vec<u8>) -> std::io::Result<usize> {
+    pub fn find_next(&self, sequence: &Vec<u8>) -> std::io::Result<usize> {
         self.find_from(sequence, self.offset.clone())
     }
-    pub fn find(&self, sequence: Vec<u8>) -> std::io::Result<usize> {
+    pub fn find(&self, sequence: &Vec<u8>) -> std::io::Result<usize> {
         self.find_from(sequence, 0)
     }
 
-    pub fn find_from(&self, sequence: Vec<u8>, mut offset: usize) -> std::io::Result<usize> {
+    pub fn find_from(&self, sequence: &Vec<u8>, mut offset: usize) -> std::io::Result<usize> {
         let bytes = sequence.len();
 
         while offset + bytes < self.length {
@@ -129,7 +129,6 @@ impl BinaryReader {
 
             offset += 1;
         }
-
         Err(Error::new(
             ErrorKind::NotFound,
             format!(

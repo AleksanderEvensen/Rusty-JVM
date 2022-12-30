@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 binary_reader = { path="../binary_reader" }
-zip = "0.6.3"
+flate2 = { version = "1.0.25", features = ["zlib"] }

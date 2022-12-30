@@ -49,6 +49,8 @@ fn main() {
 
     let jar_file = JarFile::from_file(&PathBuf::from("./java/jvm-test.jar")).unwrap();
 
+    println!("Jar File: \n{:#?}", jar_file);
+
     // dbgprint!(
     //     "Magic: {:X?}\nVersion: {} : {}",
     //     &class_file.magic,
