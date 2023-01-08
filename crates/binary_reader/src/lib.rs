@@ -31,6 +31,8 @@ pub struct BinaryReader {
     length: usize,
     /// Which endian to use when reading
     endian: Endian,
+    /// If the push_index function has been ran, the Option contains a value at that position, and can be returned to this position later using the pop_index function
+    push_offset: Option<usize>,
 }
 
 impl BinaryReader {
@@ -40,6 +42,7 @@ impl BinaryReader {
             offset: 0,
             length: vec.len(),
             endian: Endian::Little,
+            push_offset: None,
         }
     }
 
@@ -51,6 +54,7 @@ impl BinaryReader {
             length: length,
             offset: 0,
             endian: Endian::Little,
+            push_offset: None,
         })
     }
 }
@@ -68,6 +72,19 @@ impl BinaryReader {
         self.offset += jump_by;
         self
     }
+
+    pub fn push_index<'a>(&'a mut self) -> &'a mut Self {
+        self.push_offset = Some(self.offset);
+        self
+    }
+    pub fn pop_index<'a>(&'a mut self) -> &'a mut Self {
+        if let Some(offset) = self.push_offset {
+            self.offset = offset;
+            self.push_offset = None;
+        }
+        self
+    }
+
     pub fn get_current_offset(&self) -> usize {
         self.offset
     }
