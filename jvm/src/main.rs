@@ -1,6 +1,6 @@
 // use crate::jvm::JVM;
 use clap::Parser;
-use jvm_parser::jar::JarFile;
+use jvm_parser::{classfile::ClassFile, jar::JarFile};
 // use jvm_parser::{self, ClassFile};
 use std::path::PathBuf;
 

@@ -69,11 +69,11 @@ impl JarFile {
         while let Ok(offset) = jar_reader.find_next(&central_dir_file_header) {
             jar_reader.move_to(offset);
 
-            let compressed_size = jar_reader.jump(20).read_u32()?;
-            let file_name_length = jar_reader.jump(4).read_u16()? as usize;
+            let compressed_size = *jar_reader.jump(20).read::<u32>()? as usize;
+            let file_name_length = *jar_reader.jump(4).read::<u16>()? as usize;
 
             // The file offset + the fields we don't care about
-            let file_data_offset = jar_reader.jump(12).read_u32()? as usize + 28;
+            let file_data_offset = *jar_reader.jump(12).read::<u32>()? as usize + 28;
 
             // Read the file name
             let file_name = jar_reader.read_string(file_name_length)?;
@@ -85,7 +85,7 @@ impl JarFile {
             jar_reader.move_to(file_data_offset);
 
             // Read the amount of extra fields
-            let extra_field_length = jar_reader.read_u16()? as usize;
+            let extra_field_length = *jar_reader.read::<u16>()? as usize;
 
             // Read the deflated bytes
             let data = jar_reader

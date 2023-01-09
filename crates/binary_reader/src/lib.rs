@@ -3,18 +3,7 @@ use std::{
     io::{Error, ErrorKind, Read},
 };
 
-macro_rules! read_fn {
-    ($name:ident, $ty:ident, $bytes:expr) => {
-        pub fn $name(&mut self) -> std::io::Result<$ty> {
-            let endian = self.endian.clone();
-            let data = self.read_bytes($bytes)?;
-            match endian {
-                Endian::Little => Ok($ty::from_le_bytes(data[..$bytes].try_into().unwrap())),
-                Endian::Big => Ok($ty::from_be_bytes(data[..$bytes].try_into().unwrap())),
-            }
-        }
-    };
-}
+// use anyhow::{Context, Result};
 
 #[derive(Clone, Copy)]
 pub enum Endian {
@@ -146,6 +135,7 @@ impl BinaryReader {
 
             offset += 1;
         }
+
         Err(Error::new(
             ErrorKind::NotFound,
             format!(
@@ -153,6 +143,11 @@ impl BinaryReader {
                 sequence, self.offset
             ),
         ))
+    }
+
+    pub fn read_string_u16_length(&mut self) -> std::io::Result<String> {
+        let length = *self.read::<u16>().unwrap();
+        self.read_string(length as usize)
     }
 
     pub fn read_string(&mut self, length: usize) -> std::io::Result<String> {
@@ -166,13 +161,42 @@ impl BinaryReader {
         )
     }
 
-    read_fn!(read_u8, u8, 1);
-    read_fn!(read_u16, u16, 2);
-    read_fn!(read_u32, u32, 4);
-    read_fn!(read_u64, u64, 8);
-
-    read_fn!(read_i8, i8, 1);
-    read_fn!(read_i16, i16, 2);
-    read_fn!(read_i32, i32, 4);
-    read_fn!(read_i64, i64, 8);
+    pub fn read<T: FromBinaryReader>(&mut self) -> std::io::Result<Box<T>> {
+        T::from_byte_reader(self)
+    }
 }
+
+pub trait FromBinaryReader {
+    fn from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<Self>>;
+}
+
+macro_rules! impl_from_binary_reader {
+    ($ty:ident, $bytes:expr) => {
+        impl FromBinaryReader for $ty {
+            fn from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<$ty>> {
+                let endian = reader.endian.clone();
+                let data = reader.read_bytes($bytes)?;
+                match endian {
+                    Endian::Little => Ok(Box::new($ty::from_le_bytes(
+                        data[..$bytes].try_into().unwrap(),
+                    ))),
+                    Endian::Big => Ok(Box::new($ty::from_be_bytes(
+                        data[..$bytes].try_into().unwrap(),
+                    ))),
+                }
+            }
+        }
+    };
+}
+
+impl_from_binary_reader!(u8, 1);
+impl_from_binary_reader!(i8, 1);
+impl_from_binary_reader!(u16, 2);
+impl_from_binary_reader!(i16, 2);
+impl_from_binary_reader!(u32, 4);
+impl_from_binary_reader!(i32, 4);
+impl_from_binary_reader!(u64, 8);
+impl_from_binary_reader!(i64, 8);
+
+impl_from_binary_reader!(f32, 4);
+impl_from_binary_reader!(f64, 8);

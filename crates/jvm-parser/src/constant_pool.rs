@@ -1,4 +1,5 @@
-use crate::utils::big_endian::{read_bytes, read_u1, read_u2, read_u4};
+use binary_reader::BinaryReader;
+use std::io::Result;
 
 #[derive(Debug, Clone)]
 pub struct ConstantPool {
@@ -6,129 +7,49 @@ pub struct ConstantPool {
 }
 
 impl ConstantPool {
-    pub fn from_bytes(bytes: &mut Vec<u8>) -> Self {
-        let pool_count = read_u2(bytes);
-        let mut pool: Vec<CpInfo> = vec![];
+    pub fn from_reader(reader: &mut BinaryReader) -> Result<Self> {
+        let pool_count = *reader.read::<u16>()? - 1;
 
-        for _ in 0..(pool_count - 1) {
-            let cp_info = match read_u1(bytes) {
-                7 => CpInfo::Class(CpInfoClass {
-                    tag: "CONSTANT_Class".to_string(),
-                    name_index: read_u2(bytes),
-                }),
+        let mut last_was_8byte = false;
 
-                9 => CpInfo::Refs(CpInfoRefs {
-                    tag: "CONSTANT_FieldRef".to_string(),
-                    class_index: read_u2(bytes),
-                    name_and_type_index: read_u2(bytes),
-                }),
+        let entries: Vec<CpInfo> = (0..pool_count)
+            .map(|i| {
+				if last_was_8byte {
+					last_was_8byte = false;
+					return CpInfo::EmptyCpEntry;
+				}
+				let cp_tag = *reader.read::<u8>().unwrap();
 
-                10 => CpInfo::Refs(CpInfoRefs {
-                    tag: "CONSTANT_MethodRef".to_string(),
-                    class_index: read_u2(bytes),
-                    name_and_type_index: read_u2(bytes),
-                }),
+				if cp_tag == 5 || cp_tag == 6 { // CONSTANT_Long CONSTANT_Double
+					last_was_8byte = true;
+				}
 
-                11 => CpInfo::Refs(CpInfoRefs {
-                    tag: "CONSTANT_InterfaceMethodref".to_string(),
-                    class_index: read_u2(bytes),
-                    name_and_type_index: read_u2(bytes),
-                }),
+				return match cp_tag  {
+					1 => CpInfo::Utf8(CpInfoUtf8 { tag: "CONSTANT_Utf8", data: reader.read_string_u16_length().unwrap() }),
+					3 => CpInfo::Integer(CpInfoInteger { tag: "CONSTANT_Integer", bytes: *reader.read().unwrap() }),
+					4 => CpInfo::Float(CpInfoFloat { tag: "CONSTANT_Float", bytes: *reader.read().unwrap() }),
+					5 => CpInfo::Long(CpInfoLong { tag: "CONSTANT_Long", bytes: *reader.read().unwrap() }),
+					6 => CpInfo::Double(CpInfoDouble { tag: "CONSTANT_Double", bytes: *reader.read().unwrap() }),
+					7 => CpInfo::Class(CpInfoClass { tag: "CONSTANT_Class", name_index: *reader.read().unwrap() }),
+					8 => CpInfo::String(CpInfoString { tag: "CONSTANT_String", string_index: *reader.read().unwrap() }),
+					9 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_Fieldref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
+					10 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_Methodref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
+					11 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_InterfaceMethodref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
+					12 => CpInfo::NameAndType(CpInfoNameAndType { tag: "CONSTANT_NameAndType", name_index: *reader.read().unwrap(), descriptor_index: *reader.read().unwrap() }),
+					15 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_MethodHandle'"),
+					16 => CpInfo::MethodType(CpInfoMethodType { tag: "CONSTANT_MethodType", descriptor_index: *reader.read().unwrap() }),
+					17 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Dynamic'"),
+					18 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_InvokeDynamic'"),
+					19 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Module'"),
+					20 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Package'"),
 
-                8 => CpInfo::String(CpInfoString {
-                    tag: "CONSTANT_String".to_string(),
-                    string_index: read_u2(bytes),
-                }),
+					unknown_tag => unreachable!("Unknown CONSTANT_TYPE: {}\nConsult the oracle documentation for missing tag: https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-4.html#jvms-4.4\n\nSome Extra Information:\nindex: {i}\npool_count: {pool_count}\nOffset: {:#X}\n", unknown_tag, reader.get_current_offset() - 1),
+				};
+			}).collect();
 
-                3 => {
-                    let bytes = read_bytes(bytes, 4);
-
-                    let mut byte_array: [u8; 4] = Default::default();
-
-                    bytes
-                        .iter()
-                        .enumerate()
-                        .for_each(|(i, byte)| byte_array[i] = byte.clone());
-
-                    println!("{:?}", byte_array);
-                    println!("Hello World, Why isn't this executed");
-                    CpInfo::Integer(CpInfoInteger {
-                        tag: "CONSTANT_Integer".to_string(),
-                        bytes: i32::from_be_bytes(byte_array),
-                    })
-                }
-
-                4 => CpInfo::Float(CpInfoFloat {
-                    tag: "CONSTANT_Float".to_string(),
-                    bytes: f32::from_bits(read_u4(bytes)),
-                }),
-
-                5 => {
-                    let high = read_u4(bytes);
-                    let low = read_u4(bytes);
-                    let bytes: u64 = ((high as u64) << 32) + low as u64;
-
-                    CpInfo::Long(CpInfoLong {
-                        tag: "CONSTANT_Long".to_string(),
-                        high_bytes: high,
-                        low_bytes: low,
-                        bytes: bytes,
-                    })
-                }
-
-                6 => {
-                    let high = read_u4(bytes);
-                    let low = read_u4(bytes);
-                    let bytes: u64 = ((high as u64) << 32) + low as u64;
-                    let bytes = f64::from_bits(bytes);
-                    CpInfo::Double(CpInfoDouble {
-                        tag: "CONSTANT_Double".to_string(),
-                        high_bytes: high,
-                        low_bytes: low,
-                        bytes: bytes,
-                    })
-                }
-
-                12 => CpInfo::NameAndType(CpInfoNameAndType {
-                    tag: "CONSTANT_NameAndType".to_string(),
-                    name_index: read_u2(bytes),
-                    descriptor_index: read_u2(bytes),
-                }),
-
-                1 => {
-                    let length = read_u2(bytes);
-                    let text =
-                        String::from_utf8(bytes.drain(0..(length as usize)).collect::<Vec<u8>>())
-                            .unwrap();
-
-                    CpInfo::Utf8(CpInfoUtf8 {
-                        tag: "CONSTANT_Utf8".to_string(),
-                        data: text,
-                    })
-                }
-
-                15 => CpInfo::MethodHandle(CpInfoMethodHandle {
-                    tag: "CONSTANT_MethodHandle".to_string(),
-                    reference_kind: read_u1(bytes),
-                    reference_index: read_u2(bytes),
-                }),
-
-                16 => {
-                    todo!("CONSTANT_MethodType not implemented")
-                }
-
-                18 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic {
-                    tag: "CONSTANT_InvokeDynamic".to_string(),
-                    bootstrap_method_attr_index: read_u2(bytes),
-                    name_and_type_index: read_u2(bytes),
-                }),
-                unknown_tag => {
-                    panic!("Unknown CONSTANT_TYPE: {}", unknown_tag)
-                }
-            };
-            pool.push(cp_info);
-        }
-        ConstantPool { pool_entries: pool }
+        Ok(Self {
+            pool_entries: entries,
+        })
     }
 
     pub fn get_at(&self, index: u16) -> Option<&CpInfo> {
@@ -174,6 +95,11 @@ impl ConstantPool {
 // From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.4
 #[derive(Debug, Clone)]
 pub enum CpInfo {
+    /// This dumb mf was needed because Oracle thought it was funny that 8byte Constant Pool entries shuld take up two spots
+    /// Thankfully they admitted that this was a dumb mistake on their side (too late to fix apparently)
+    /// Source: Check the italic text: https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-4.html#jvms-4.4.5
+    EmptyCpEntry,
+
     Class(CpInfoClass),
     Refs(CpInfoRefs),
     NameAndType(CpInfoNameAndType),
@@ -185,75 +111,78 @@ pub enum CpInfo {
     Double(CpInfoDouble),
     InvokeDynamic(CpInfoInvokeDynamic),
     MethodHandle(CpInfoMethodHandle),
+    MethodType(CpInfoMethodType),
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoInteger {
-    pub tag: String,
+    pub tag: &'static str,
     pub bytes: i32,
 }
 #[derive(Debug, Clone)]
 pub struct CpInfoFloat {
-    pub tag: String,
+    pub tag: &'static str,
     pub bytes: f32,
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoLong {
-    pub tag: String,
-    pub high_bytes: u32,
-    pub low_bytes: u32,
+    pub tag: &'static str,
     pub bytes: u64,
 }
 #[derive(Debug, Clone)]
 pub struct CpInfoDouble {
-    pub tag: String,
-    pub high_bytes: u32,
-    pub low_bytes: u32,
+    pub tag: &'static str,
     pub bytes: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoClass {
-    pub tag: String,
+    pub tag: &'static str,
     pub name_index: u16,
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoRefs {
-    pub tag: String,
+    pub tag: &'static str,
     pub class_index: u16,
     pub name_and_type_index: u16,
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoNameAndType {
-    pub tag: String,
+    pub tag: &'static str,
     pub name_index: u16,
     pub descriptor_index: u16,
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoUtf8 {
-    pub tag: String,
+    pub tag: &'static str,
     pub data: String,
 }
 #[derive(Debug, Clone)]
 pub struct CpInfoString {
-    pub tag: String,
+    pub tag: &'static str,
     pub string_index: u16,
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoInvokeDynamic {
-    pub tag: String,
+    pub tag: &'static str,
     pub bootstrap_method_attr_index: u16,
     pub name_and_type_index: u16,
 }
 
 #[derive(Debug, Clone)]
 pub struct CpInfoMethodHandle {
-    pub tag: String,
+    pub tag: &'static str,
     pub reference_kind: u8,
     pub reference_index: u16,
+}
+
+#[derive(Debug, Clone)]
+pub struct CpInfoMethodType {
+    pub tag: &'static str,
+    pub descriptor_index: u16,
 }

@@ -1,6 +1,8 @@
 use std::process::{Command, Stdio};
 
 fn main() {
+    println!("cargo:rerun-if-changed=java/com/");
+
     let java_child = Command::new("javac")
         .args([
             "-sourcepath",
@@ -8,10 +10,6 @@ fn main() {
             "-d",
             "../java/out",
             "../java/com/ahse/jvm/Main.java",
-            "-source",
-            "7",
-            "-target",
-            "7",
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

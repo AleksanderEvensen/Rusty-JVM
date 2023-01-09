@@ -1,9 +1,10 @@
+use binary_reader::{BinaryReader, Endian};
+
 use crate::attributes::{
     AttributeInfo, AttributeInfoData, BootstrapMethod, BootstrapMethodsAttribute, CodeAttribute,
     ExceptionTable, LineNumber, LineNumberTableAttribute, SourceFileAttribute,
 };
 use crate::constant_pool::ConstantPool;
-use crate::utils::big_endian::{read_bytes, read_u2, read_u4};
 use std::{error::Error, path::PathBuf};
 
 // From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.1
@@ -26,107 +27,116 @@ impl ClassFile {
     pub fn from_file(path: &PathBuf) -> Result<ClassFile, Box<dyn Error>> {
         ClassFile::from_bytes(std::fs::read(path)?)
     }
-    pub fn from_bytes(mut bytes: Vec<u8>) -> Result<ClassFile, Box<dyn Error>> {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<ClassFile, Box<dyn Error>> {
+        let mut reader = BinaryReader::from_vec(&bytes);
+        reader.set_endian(Endian::Big);
+
         let mut class = ClassFile {
-            magic: read_u4(&mut bytes),
-            minor_version: read_u2(&mut bytes),
-            major_version: read_u2(&mut bytes),
-            constant_pool: ConstantPool::from_bytes(&mut bytes),
+            magic: *reader.read()?,
+            minor_version: *reader.read()?,
+            major_version: *reader.read()?,
+            constant_pool: ConstantPool::from_reader(&mut reader)?,
             access_flags: AccessFlags {
                 flags: parse_flags(
-                    read_u2(&mut bytes),
+                    *reader.read()?,
                     vec![
-                        (0x001, "ACC_PUBLIC".to_string()),
-                        (0x0010, "ACC_FINAL".to_string()),
-                        (0x0020, "ACC_SUPER".to_string()),
-                        (0x0020, "ACC_INTERFACE".to_string()),
-                        (0x0040, "ACC_ABSTRACT".to_string()),
-                        (0x1000, "ACC_SYNTHETIC".to_string()),
-                        (0x2000, "ACC_ANNOTATION".to_string()),
-                        (0x4000, "ACC_ENUM".to_string()),
+                        (0x001, "ACC_PUBLIC"),
+                        (0x0010, "ACC_FINAL"),
+                        (0x0020, "ACC_SUPER"),
+                        (0x0020, "ACC_INTERFACE"),
+                        (0x0040, "ACC_ABSTRACT"),
+                        (0x1000, "ACC_SYNTHETIC"),
+                        (0x2000, "ACC_ANNOTATION"),
+                        (0x4000, "ACC_ENUM"),
                     ],
                 ),
             },
-            this_class: read_u2(&mut bytes),
-            super_class: read_u2(&mut bytes),
-            interfaces: Vec::with_capacity(read_u2(&mut bytes) as usize), // TODO: Implement interface parsing from bytes
-            fields: Vec::with_capacity(read_u2(&mut bytes) as usize), // TODO: Implement field parsing from bytes
+            this_class: *reader.read()?,
+            super_class: *reader.read()?,
+            interfaces: Vec::with_capacity(*reader.read::<u16>()? as usize), // TODO: Implement interface parsing from bytes
+            fields: Vec::with_capacity(*reader.read::<u16>()? as usize), // TODO: Implement field parsing from bytes
             methods: vec![],
             attributes: vec![],
         };
 
-        class.methods = ClassFile::parse_methods(&mut bytes, &class.constant_pool);
+        class.methods = ClassFile::parse_methods(&mut reader, &class.constant_pool)?;
 
-        class.attributes = ClassFile::parse_attributes(&mut bytes, &class.constant_pool);
+        class.attributes = ClassFile::parse_attributes(&mut reader, &class.constant_pool)?;
 
         Ok(class)
     }
 
-    fn parse_methods(bytes: &mut Vec<u8>, constant_pool: &ConstantPool) -> Vec<MethodInfo> {
-        let method_count = read_u2(bytes);
+    fn parse_methods(
+        reader: &mut BinaryReader,
+        constant_pool: &ConstantPool,
+    ) -> Result<Vec<MethodInfo>, Box<dyn Error>> {
+        let method_count: u16 = *reader.read()?;
         let mut methods = vec![];
 
         for _ in 0..method_count as usize {
             let mut method = MethodInfo {
                 access_flags: AccessFlags {
                     flags: parse_flags(
-                        read_u2(bytes),
+                        *reader.read()?,
                         vec![
-                            (0x0001, "ACC_PUBLIC".to_string()),
-                            (0x0002, "ACC_PRIVATE".to_string()),
-                            (0x0004, "ACC_PROTECTED".to_string()),
-                            (0x0008, "ACC_STATIC".to_string()),
-                            (0x0010, "ACC_FINAL".to_string()),
-                            (0x0020, "ACC_SYNCHRONIZED".to_string()),
-                            (0x0040, "ACC_BRIDGE".to_string()),
-                            (0x0080, "ACC_VARARGS".to_string()),
-                            (0x0100, "ACC_NATIVE".to_string()),
-                            (0x0400, "ACC_ABSTRACT".to_string()),
-                            (0x0800, "ACC_STRICT".to_string()),
-                            (0x1000, "ACC_SYNTHETIC".to_string()),
+                            (0x0001, "ACC_PUBLIC"),
+                            (0x0002, "ACC_PRIVATE"),
+                            (0x0004, "ACC_PROTECTED"),
+                            (0x0008, "ACC_STATIC"),
+                            (0x0010, "ACC_FINAL"),
+                            (0x0020, "ACC_SYNCHRONIZED"),
+                            (0x0040, "ACC_BRIDGE"),
+                            (0x0080, "ACC_VARARGS"),
+                            (0x0100, "ACC_NATIVE"),
+                            (0x0400, "ACC_ABSTRACT"),
+                            (0x0800, "ACC_STRICT"),
+                            (0x1000, "ACC_SYNTHETIC"),
                         ],
                     ),
                 },
-                name_index: read_u2(bytes),
-                descriptor_index: read_u2(bytes),
+                name_index: *reader.read()?,
+                descriptor_index: *reader.read()?,
                 attributes: vec![],
             };
-            method.attributes = ClassFile::parse_attributes(bytes, constant_pool);
+            method.attributes = ClassFile::parse_attributes(reader, constant_pool)?;
             methods.push(method);
         }
 
-        methods
+        Ok(methods)
     }
 
-    fn parse_attributes(bytes: &mut Vec<u8>, constant_pool: &ConstantPool) -> Vec<AttributeInfo> {
-        let attribute_count = read_u2(bytes);
+    fn parse_attributes(
+        reader: &mut BinaryReader,
+        constant_pool: &ConstantPool,
+    ) -> Result<Vec<AttributeInfo>, Box<dyn Error>> {
+        let attribute_count: u16 = *reader.read()?;
         let mut attributes = vec![];
 
         for _ in 0..attribute_count.to_owned() as usize {
-            let attribute_name_index = read_u2(bytes);
-            let _ = read_u4(bytes);
+            let attribute_name_index = *reader.read()?;
+            let _ = *reader.read::<u32>()?;
 
             let attribute_tag = constant_pool.get_utf8_at(attribute_name_index).unwrap();
             let attribute = match attribute_tag.data.as_str() {
                 "Code" => {
-                    let max_stack = read_u2(bytes);
-                    let max_locals = read_u2(bytes);
-                    let code_length = read_u4(bytes);
-                    let code = read_bytes(bytes, code_length as usize);
-                    let exception_table_length = read_u2(bytes);
+                    let max_stack = *reader.read()?;
+                    let max_locals = *reader.read()?;
+                    let code_length: u32 = *reader.read()?;
+                    let code = reader.read_bytes(code_length as usize)?;
+                    let exception_table_length: u16 = *reader.read()?;
 
                     let mut exception_table = vec![];
 
                     for _ in 0..exception_table_length as usize {
                         exception_table.push(ExceptionTable {
-                            start_pc: read_u2(bytes),
-                            end_pc: read_u2(bytes),
-                            handler_pc: read_u2(bytes),
-                            catch_type: read_u2(bytes),
+                            start_pc: *reader.read()?,
+                            end_pc: *reader.read()?,
+                            handler_pc: *reader.read()?,
+                            catch_type: *reader.read()?,
                         });
                     }
 
-                    let attribute_info = ClassFile::parse_attributes(bytes, constant_pool);
+                    let attribute_info = ClassFile::parse_attributes(reader, constant_pool)?;
 
                     AttributeInfoData::Code(CodeAttribute {
                         max_stack,
@@ -138,13 +148,13 @@ impl ClassFile {
                 }
 
                 "LineNumberTable" => {
-                    let line_number_table_length = read_u2(bytes);
+                    let line_number_table_length: u16 = *reader.read()?;
                     let mut line_number_table = vec![];
 
                     for _ in 0..line_number_table_length as usize {
                         line_number_table.push(LineNumber {
-                            start_pc: read_u2(bytes),
-                            line_number: read_u2(bytes),
+                            start_pc: *reader.read()?,
+                            line_number: *reader.read()?,
                         })
                     }
 
@@ -154,23 +164,23 @@ impl ClassFile {
                 }
 
                 "SourceFile" => AttributeInfoData::SourceFile(SourceFileAttribute {
-                    sourcefile_index: read_u2(bytes),
+                    sourcefile_index: *reader.read()?,
                 }),
 
                 "BootstrapMethods" => {
-                    let attribute_name_index = read_u2(bytes);
+                    let attribute_name_index = *reader.read()?;
                     #[allow(unused_variables)]
-                    let attribute_length = read_u4(bytes);
-                    let num_bootstrap_methods = read_u2(bytes);
+                    let attribute_length: u32 = *reader.read()?;
+                    let num_bootstrap_methods: u16 = *reader.read()?;
                     let mut bootstrap_methods = vec![];
 
                     for _ in 0..num_bootstrap_methods as usize {
-                        let bootstrap_method_ref = read_u2(bytes);
-                        let num_bootstrap_arguments = read_u2(bytes);
+                        let bootstrap_method_ref = *reader.read()?;
+                        let num_bootstrap_arguments: u16 = *reader.read()?;
                         let mut bootstrap_arguments = vec![];
 
                         for _ in 0..num_bootstrap_arguments as usize {
-                            let arg_index = read_u2(bytes);
+                            let arg_index = *reader.read()?;
                             bootstrap_arguments.push(arg_index);
                         }
 
@@ -199,12 +209,12 @@ impl ClassFile {
             });
         }
 
-        attributes
+        Ok(attributes)
     }
 }
 #[derive(Debug)]
 pub struct AccessFlags {
-    pub flags: Vec<String>,
+    pub flags: Vec<&'static str>,
 }
 
 #[derive(Debug)]
