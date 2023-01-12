@@ -1,61 +1,61 @@
 #[derive(Debug, Default, Clone)]
 pub struct AttributeInfo {
-	pub attribute_name_index: u16,
-	pub attribute: AttributeInfoData,
+    pub attribute_name_index: u16,
+    pub attribute: AttributeInfoData,
 }
 
 #[derive(Debug, Default, Clone)]
 pub enum AttributeInfoData {
-	#[default]
-	None,
+    #[default]
+    None,
 
-	Code(CodeAttribute),
-	LineNumberTable(LineNumberTableAttribute),
-	SourceFile(SourceFileAttribute),
-	BootstrapMethods(BootstrapMethodsAttribute),
+    Code(CodeAttribute),
+    LineNumberTable(LineNumberTableAttribute),
+    SourceFile(SourceFileAttribute),
+    BootstrapMethods(BootstrapMethodsAttribute),
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct CodeAttribute {
-	pub max_stack: u16,
-	pub max_locals: u16,
-	pub code: Vec<u8>,
-	pub exception_table: Vec<ExceptionTable>,
-	pub attribute_info: Vec<AttributeInfo>,
+    pub max_stack: u16,
+    pub max_locals: u16,
+    pub code: Vec<u8>,
+    pub exception_table: Vec<ExceptionTable>,
+    pub attribute_info: Vec<AttributeInfo>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct SourceFileAttribute {
-	pub sourcefile_index: u16,
+    pub sourcefile_index: u16,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct LineNumberTableAttribute {
-	pub line_number_table: Vec<LineNumber>,
+    pub line_number_table: Vec<LineNumber>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct LineNumber {
-	pub start_pc: u16,
-	pub line_number: u16,
+    pub start_pc: u16,
+    pub line_number: u16,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct ExceptionTable {
-	pub start_pc: u16,
-	pub end_pc: u16,
-	pub handler_pc: u16,
-	pub catch_type: u16,
+    pub start_pc: u16,
+    pub end_pc: u16,
+    pub handler_pc: u16,
+    pub catch_type: u16,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct BootstrapMethodsAttribute {
-	pub attribute_name_index: u16,
-	pub bootstrap_methods: Vec<BootstrapMethod>,
+    pub attribute_name_index: u16,
+    pub bootstrap_methods: Vec<BootstrapMethod>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct BootstrapMethod {
-	pub bootstrap_method_ref: u16,
-	pub bootstrap_arguments: Vec<u16>,
+    pub bootstrap_method_ref: u16,
+    pub bootstrap_arguments: Vec<u16>,
 }
