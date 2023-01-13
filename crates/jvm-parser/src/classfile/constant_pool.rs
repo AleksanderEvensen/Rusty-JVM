@@ -24,7 +24,7 @@ impl ConstantPool {
                 }
 
                 return match cp_tag  {
-                    1 => CpInfo::Utf8(CpInfoUtf8 { tag: "CONSTANT_Utf8", data: reader.read_string_u16_length().unwrap() }),
+                    1 => CpInfo::Utf8(CpInfoUtf8 { tag: "CONSTANT_Utf8", data: reader.read_string_lossy_length::<u16>().unwrap() }),
                     3 => CpInfo::Integer(CpInfoInteger { tag: "CONSTANT_Integer", bytes: *reader.read().unwrap() }),
                     4 => CpInfo::Float(CpInfoFloat { tag: "CONSTANT_Float", bytes: *reader.read().unwrap() }),
                     5 => CpInfo::Long(CpInfoLong { tag: "CONSTANT_Long", bytes: *reader.read().unwrap() }),
@@ -35,10 +35,10 @@ impl ConstantPool {
                     10 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_Methodref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
                     11 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_InterfaceMethodref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
                     12 => CpInfo::NameAndType(CpInfoNameAndType { tag: "CONSTANT_NameAndType", name_index: *reader.read().unwrap(), descriptor_index: *reader.read().unwrap() }),
-                    15 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_MethodHandle'"),
+                    15 => CpInfo::MethodHandle(CpInfoMethodHandle { tag: "CONSTANT_MethodHandle", reference_kind: *reader.read().unwrap(), reference_index: *reader.read().unwrap() }),
                     16 => CpInfo::MethodType(CpInfoMethodType { tag: "CONSTANT_MethodType", descriptor_index: *reader.read().unwrap() }),
-                    17 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Dynamic'"),
-                    18 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_InvokeDynamic'"),
+                    17 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic { tag: "CONSTANT_Dynamic", bootstrap_method_attr_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
+                    18 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic { tag: "CONSTANT_InvokeDynamic", bootstrap_method_attr_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
                     19 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Module'"),
                     20 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Package'"),
 

@@ -3,3 +3,5 @@
 /java/*.jar
 /java/out
 java-build-output.txt
+
+rt.jar

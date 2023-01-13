@@ -13,6 +13,8 @@ pub enum AttributeInfoData {
     LineNumberTable(LineNumberTableAttribute),
     SourceFile(SourceFileAttribute),
     BootstrapMethods(BootstrapMethodsAttribute),
+    LocalVariableTable(LocalVariableTableAttribute),
+    Signature(SignatureAttribute),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -58,4 +60,22 @@ pub struct BootstrapMethodsAttribute {
 pub struct BootstrapMethod {
     pub bootstrap_method_ref: u16,
     pub bootstrap_arguments: Vec<u16>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct SignatureAttribute {
+    pub signature_index: u16,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct LocalVariableTableAttribute {
+    pub local_variable_table: Vec<VariableTableEntry>,
+}
+#[derive(Debug, Default, Clone)]
+pub struct VariableTableEntry {
+    pub start_pc: u16,
+    pub length: u16,
+    pub name_index: u16,
+    pub descriptor_index: u16,
+    pub index: u16,
 }

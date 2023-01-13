@@ -26,11 +26,19 @@ impl JarManifest {
         let mut data = String::new();
         decoder.read_to_string(&mut data).unwrap();
 
+        JarManifest::from_string(&data)
+    }
+
+    pub fn from_bytes(bytes: &Vec<u8>) -> JarManifest {
+        JarManifest::from_string(&String::from_utf8(bytes.clone()).unwrap())
+    }
+
+    pub fn from_string(manifest_content: &String) -> JarManifest {
         let mut manifest = JarManifest {
             ..Default::default()
         };
 
-        data.lines().for_each(|line| {
+        manifest_content.lines().for_each(|line| {
             if line.trim() == "" {
                 return;
             }
@@ -44,10 +52,10 @@ impl JarManifest {
                     "Created-By" => manifest.created_by = Some(value.to_string()),
                     "Main-Class" => manifest.main_class = Some(value.to_string()),
 
-                    _ => todo!("Implement manifest parsing for key: '{}'", attribute),
+                    _ => {} //println!("Implement manifest parsing for key: '{}'", attribute),
                 };
             } else {
-                println!("Failed to parse line: {:?}", line)
+                // println!("Failed to parse line: {:?}", line)
             }
         });
 
@@ -73,7 +81,7 @@ impl JarFile {
             let file_name_length = *jar_reader.jump(4).read::<u16>()? as usize;
 
             // The file offset + the fields we don't care about
-            let file_data_offset = *jar_reader.jump(12).read::<u32>()? as usize + 28;
+            let file_data_offset = *jar_reader.jump(12).read::<u32>()? as usize;
 
             // Read the file name
             let file_name = jar_reader.read_string(file_name_length)?;
@@ -84,8 +92,10 @@ impl JarFile {
             // Move to the file entry
             jar_reader.move_to(file_data_offset);
 
+            let compression_method = *jar_reader.jump(8).read::<u16>()?;
+
             // Read the amount of extra fields
-            let extra_field_length = *jar_reader.read::<u16>()? as usize;
+            let extra_field_length = *jar_reader.jump(18).read::<u16>()? as usize;
 
             // Read the deflated bytes
             let data = jar_reader
@@ -96,15 +106,23 @@ impl JarFile {
             jar_reader.move_to(old_offset);
 
             if file_name == "META-INF/MANIFEST.MF" {
-                jar_file.manifest = JarManifest::from_deflated_bytes(&data);
+                match compression_method {
+                    0 => jar_file.manifest = JarManifest::from_bytes(&data),
+                    20 => jar_file.manifest = JarManifest::from_deflated_bytes(&data),
+                    unknown_method => todo!("Zip Decompression method for id: {unknown_method}"),
+                }
             } else if file_name.ends_with(".class") {
-                let mut decoder = DeflateDecoder::new(data.as_slice());
-                let mut buffer = vec![];
-
-                decoder.read_to_end(&mut buffer).unwrap();
-
-                let class_file = ClassFile::from_bytes(buffer).unwrap();
-
+                let bytes = match compression_method {
+                    0 => data,
+                    20 => {
+                        let mut decoder = DeflateDecoder::new(data.as_slice());
+                        let mut buffer = vec![];
+                        decoder.read_to_end(&mut buffer).unwrap();
+                        buffer
+                    }
+                    unknown_method => todo!("Zip Decompression method for id: {unknown_method}"),
+                };
+                let class_file = ClassFile::from_bytes(bytes).unwrap();
                 let class = class_file
                     .constant_pool
                     .get_class_at(class_file.this_class)

@@ -145,9 +145,17 @@ impl BinaryReader {
         ))
     }
 
-    pub fn read_string_u16_length(&mut self) -> std::io::Result<String> {
-        let length = *self.read::<u16>().unwrap();
-        self.read_string(length as usize)
+    pub fn read_string_length<T: FromBinaryReader + Into<usize>>(
+        &mut self,
+    ) -> std::io::Result<String> {
+        let length = *self.read::<T>().unwrap();
+        self.read_string(length.into())
+    }
+    pub fn read_string_lossy_length<T: FromBinaryReader + Into<usize>>(
+        &mut self,
+    ) -> std::io::Result<String> {
+        let length = *self.read::<T>().unwrap();
+        self.read_string_lossy(length.into())
     }
 
     pub fn read_string(&mut self, length: usize) -> std::io::Result<String> {
@@ -159,6 +167,10 @@ impl BinaryReader {
                 )
             })?,
         )
+    }
+
+    pub fn read_string_lossy(&mut self, length: usize) -> std::io::Result<String> {
+        Ok(String::from_utf8_lossy(self.read_bytes(length)?.as_slice()).to_string())
     }
 
     pub fn read<T: FromBinaryReader>(&mut self) -> std::io::Result<Box<T>> {

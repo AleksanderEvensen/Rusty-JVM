@@ -114,7 +114,7 @@ impl ClassFile {
         let attribute_count: u16 = *reader.read()?;
         let mut attributes = vec![];
 
-        for _ in 0..attribute_count.to_owned() as usize {
+        for i in 0..attribute_count.to_owned() as usize {
             let attribute_name_index = *reader.read()?;
             let attribute_length = *reader.read::<u32>()?;
 
@@ -171,9 +171,9 @@ impl ClassFile {
                 }),
 
                 "BootstrapMethods" => {
-                    let attribute_name_index = *reader.read()?;
-                    #[allow(unused_variables)]
-                    let attribute_length: u32 = *reader.read()?;
+                    // let attribute_name_index = *reader.read()?;
+                    // #[allow(unused_variables)]
+                    // let attribute_length: u32 = *reader.read()?;
                     let num_bootstrap_methods: u16 = *reader.read()?;
                     let mut bootstrap_methods = vec![];
 
@@ -198,11 +198,22 @@ impl ClassFile {
                         bootstrap_methods,
                     })
                 }
+                // "LocalVariableTable"
+                // | "Signature"
+                // | "LocalVariableTypeTable"
+                // | "StackMapTable"
+                // | "ConstantValue" => {
+                //     reader.jump(attribute_length as usize);
 
+                //     AttributeInfoData::None
+                // }
                 not_implemented_type => {
-                    reader.jump(attribute_length as usize); // TODO: Check if this is correct
+                    reader.jump(attribute_length as usize);
 
-                    println!("Skipping parsing for attribute: {}", not_implemented_type);
+                    // println!(
+                    //     "#{i} = Skipping parsing for attribute: {}",
+                    //     not_implemented_type
+                    // );
 
                     AttributeInfoData::None
 
