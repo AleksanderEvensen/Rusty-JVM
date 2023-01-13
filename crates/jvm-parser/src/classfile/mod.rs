@@ -1,10 +1,12 @@
-use binary_reader::{BinaryReader, Endian};
+pub mod attributes;
+pub mod constant_pool;
 
-use crate::attributes::{
+use crate::classfile::attributes::{
     AttributeInfo, AttributeInfoData, BootstrapMethod, BootstrapMethodsAttribute, CodeAttribute,
     ExceptionTable, LineNumber, LineNumberTableAttribute, SourceFileAttribute,
 };
-use crate::constant_pool::ConstantPool;
+use crate::classfile::constant_pool::ConstantPool;
+use binary_reader::{BinaryReader, Endian};
 use std::{error::Error, path::PathBuf};
 
 // From: https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html#jvms-4.1

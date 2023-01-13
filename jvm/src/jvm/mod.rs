@@ -4,7 +4,8 @@ pub mod opcodes;
 use crate::dbgprint;
 use std::collections::HashMap;
 
-use jvm_parser::ClassFile;
+use jvm_parser::classfile::ClassFile;
+// use jvm_parser::ClassFile;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]

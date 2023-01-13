@@ -12,6 +12,11 @@ impl ConstantPool {
 
         let mut last_was_8byte = false;
 
+        let mut pool_iter = (0..pool_count).into_iter();
+        pool_iter.for_each(|v| {
+            println!("I: {}", v);
+        });
+
         let entries: Vec<CpInfo> = (0..pool_count)
             .map(|i| {
                 if last_was_8byte {
