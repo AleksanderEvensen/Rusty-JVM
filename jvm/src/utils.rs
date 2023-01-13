@@ -1,5 +1,7 @@
+#![allow(unused)]
 use std::str::Chars;
 #[derive(Debug, PartialEq, Eq)]
+
 pub enum DescriptorTypes {
     Void,
     Byte,

@@ -1,7 +1,5 @@
 pub mod opcodes;
 
-#[allow(unused)]
-use crate::dbgprint;
 use std::collections::HashMap;
 
 use jvm_parser::classfile::ClassFile;
