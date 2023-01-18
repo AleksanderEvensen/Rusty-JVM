@@ -9,9 +9,8 @@ use std::{error::Error, path::PathBuf};
 use super::attributes::{
     ConstantValueAttribute, EnclosingMethodAttribute, ExceptionsAttribute,
     LocalVariableTableAttribute, LocalVariableTableEntry, LocalVariableTypeTableAttribute,
-    SignatureAttribute, StackMapFrame, StackMapTableAttribute,
+    SignatureAttribute, StackMapTableAttribute,
 };
-
 #[derive(Debug)]
 pub struct ClassFile {
     pub magic: u32,
@@ -120,6 +119,7 @@ impl ClassFile {
         let attribute_count: u16 = *reader.read()?;
         let mut attributes = vec![];
 
+        #[allow(unused_variables)]
         for i in 0..attribute_count.to_owned() as usize {
             let attribute_name_index = *reader.read()?;
             let attribute_length = *reader.read::<u32>()?;

@@ -29,7 +29,7 @@ fn main() {
 
     let file = args
         .path
-        .or_else(|| Some(PathBuf::from("./aic.class")))
+        .or_else(|| Some(PathBuf::from("./java/jvm-test.jar")))
         .unwrap();
 
     println!("File: {:?}", file);
