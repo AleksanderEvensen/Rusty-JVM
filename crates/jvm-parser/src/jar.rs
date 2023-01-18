@@ -108,13 +108,13 @@ impl JarFile {
             if file_name == "META-INF/MANIFEST.MF" {
                 match compression_method {
                     0 => jar_file.manifest = JarManifest::from_bytes(&data),
-                    20 => jar_file.manifest = JarManifest::from_deflated_bytes(&data),
+                    8 => jar_file.manifest = JarManifest::from_deflated_bytes(&data),
                     unknown_method => todo!("Zip Decompression method for id: {unknown_method}"),
                 }
             } else if file_name.ends_with(".class") {
                 let bytes = match compression_method {
                     0 => data,
-                    20 => {
+                    8 => {
                         let mut decoder = DeflateDecoder::new(data.as_slice());
                         let mut buffer = vec![];
                         decoder.read_to_end(&mut buffer).unwrap();
