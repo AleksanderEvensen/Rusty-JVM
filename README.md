@@ -1,18 +1,20 @@
 # Java Virtual Machine in rust
 
-This was primarily for fun and i wanted to implement Hello World from Java Byte Code.
-Not All java features are implemented (obviously), but atleast whats necessary to get "Hello World" printed on the screen
+_NOTE: This is only for educatinal purposes, and is not a complete implementation of oracles jvm_
+
+It can only parse (almost) all class and jar files in the current state of the implementation.
+
+Not All java features are implemented (obviously).
 
 ```sh
-javac java/MainProgram.java # Will produce the MyProgram.class
-cargo run # File path is hardcoded (may change in the future)
+jvm.exe --path "<path_to_file>.(jar|class)"
 ```
 
-Everything needed to implement i written in thew oracle documentation:
+Everything needed to implement, is written in thew oracle documentation:
 
-[Oracle: The `class` File Format](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-4.html)
+[Oracle: The `class` File Format](https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-4.html)
 
-[Oracle: The Java Virtual Machine Instruction Set](https://docs.oracle.com/javase/specs/jvms/se7/html/jvms-6.html)
+[Oracle: The Java Virtual Machine Instruction Set](https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-6.html)
 
 Goals:
 
