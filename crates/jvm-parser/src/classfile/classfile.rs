@@ -6,6 +6,12 @@ use crate::classfile::constant_pool::ConstantPool;
 use binary_reader::{BinaryReader, Endian};
 use std::{error::Error, path::PathBuf};
 
+use super::attributes::{
+    ConstantValueAttribute, EnclosingMethodAttribute, ExceptionsAttribute,
+    LocalVariableTableAttribute, LocalVariableTableEntry, LocalVariableTypeTableAttribute,
+    SignatureAttribute, StackMapFrame, StackMapTableAttribute,
+};
+
 #[derive(Debug)]
 pub struct ClassFile {
     pub magic: u32,
@@ -171,9 +177,6 @@ impl ClassFile {
                 }),
 
                 "BootstrapMethods" => {
-                    // let attribute_name_index = *reader.read()?;
-                    // #[allow(unused_variables)]
-                    // let attribute_length: u32 = *reader.read()?;
                     let num_bootstrap_methods: u16 = *reader.read()?;
                     let mut bootstrap_methods = vec![];
 
@@ -198,29 +201,121 @@ impl ClassFile {
                         bootstrap_methods,
                     })
                 }
-                // "LocalVariableTable"
-                // | "Signature"
-                // | "LocalVariableTypeTable"
-                // | "StackMapTable"
-                // | "ConstantValue" => {
-                //     reader.jump(attribute_length as usize);
 
-                //     AttributeInfoData::None
-                // }
-                not_implemented_type => {
+                "Signature" => AttributeInfoData::Signature(SignatureAttribute {
+                    signature_index: *reader.read().unwrap(),
+                }),
+
+                "EnclosingMethod" => AttributeInfoData::EnclosingMethod(EnclosingMethodAttribute {
+                    class_index: *reader.read().unwrap(),
+                    method_index: *reader.read().unwrap(),
+                }),
+
+                "InnerClasses" => {
                     reader.jump(attribute_length as usize);
+                    AttributeInfoData::None
+                }
+
+                "Exceptions" => AttributeInfoData::Exceptions(ExceptionsAttribute {
+                    exception_index_table: (0..*reader.read::<u16>().unwrap())
+                        .map(|_| *reader.read().unwrap())
+                        .collect(),
+                }),
+
+                "StackMapTable" => {
+                    reader.jump(attribute_length as usize);
+                    // println!("StackMapTable not implemented");
+
+                    AttributeInfoData::StackMapTable(StackMapTableAttribute { entries: vec![] })
+                    /*
+                    AttributeInfoData::StackMapTable(StackMapTableAttribute {
+                        entries: (0..*reader.read::<u16>().unwrap())
+                            .map(|_| {
+                                let frame_type: u8 = *reader.read().unwrap();
+
+                                match frame_type {
+                                    0..=63 => StackMapFrame::SameFrame,
+                                    64..=127 => StackMapFrame::SameLocalsStackItemFrame,
+                                    247 => StackMapFrame::SameLocalsStackItemFrameExtended,
+                                    248..=250 => StackMapFrame::ChopFrame,
+                                    251 => StackMapFrame::SameFrameExtended,
+                                    252..=254 => StackMapFrame::AppendFrame,
+                                    255 => StackMapFrame::FullFrame,
+
+                                    _ => unreachable!("This should be unreacable if everything"),
+                                }
+                            })
+                            .collect(),
+                    })
+                    */
+                }
+                "ConstantValue" => AttributeInfoData::ConstantValue(ConstantValueAttribute {
+                    constantvalue_index: *reader.read().unwrap(),
+                }),
+
+                "LocalVariableTable" => {
+                    AttributeInfoData::LocalVariableTable(LocalVariableTableAttribute {
+                        local_variable_table: (0..*reader.read::<u16>().unwrap())
+                            .map(|_| LocalVariableTableEntry {
+                                start_pc: *reader.read().unwrap(),
+                                length: *reader.read().unwrap(),
+                                name_index: *reader.read().unwrap(),
+                                signature_descriptor_index: *reader.read().unwrap(),
+                                index: *reader.read().unwrap(),
+                            })
+                            .collect(),
+                    })
+                }
+
+                "LocalVariableTypeTable" => {
+                    AttributeInfoData::LocalVariableTypeTable(LocalVariableTypeTableAttribute {
+                        local_variable_type_table: (0..*reader.read::<u16>().unwrap())
+                            .map(|_| LocalVariableTableEntry {
+                                start_pc: *reader.read().unwrap(),
+                                length: *reader.read().unwrap(),
+                                name_index: *reader.read().unwrap(),
+                                signature_descriptor_index: *reader.read().unwrap(),
+                                index: *reader.read().unwrap(),
+                            })
+                            .collect(),
+                    })
+                }
+
+                "Synthetic" => AttributeInfoData::Synthetic,
+
+                // Optional to implement
+                "SourceDebugExtension"
+                | "Deprecated"
+                | "RuntimeVisibleAnnotations"
+                | "RuntimeInvisibleAnnotations"
+                | "RuntimeVisibleParameterAnnotations"
+                | "RuntimeInvisibleParameterAnnotations"
+                | "RuntimeVisibleTypeAnnotations"
+                | "RuntimeInvisibleTypeAnnotations"
+                | "AnnotationDefault"
+                | "MethodParameters"
+                | "Module"
+                | "ModulePackages"
+                | "ModuleMainClass" => {
+                    // Just skip over them
+                    reader.jump(attribute_length as usize);
+                    // Add it with the attribute tag (so we can see it is skipped)
+                    AttributeInfoData::NoneAnnotated(attribute_tag.data.clone())
+                }
+
+                not_implemented_type => {
+                    // reader.jump(attribute_length as usize);
 
                     // println!(
                     //     "#{i} = Skipping parsing for attribute: {}",
                     //     not_implemented_type
                     // );
 
-                    AttributeInfoData::None
-
-                    // todo!(
-                    //     "Implement attribute parsing for attribute: {}",
-                    //     not_implemented_type
-                    // )
+                    // AttributeInfoData::None
+                    todo!(
+                        "Implement attribute parsing for attribute: {}",
+                        not_implemented_type
+                    )
                 }
             };
             attributes.push(AttributeInfo {

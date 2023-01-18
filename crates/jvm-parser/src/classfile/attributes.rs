@@ -8,13 +8,20 @@ pub struct AttributeInfo {
 pub enum AttributeInfoData {
     #[default]
     None,
+    NoneAnnotated(String),
 
     Code(CodeAttribute),
     LineNumberTable(LineNumberTableAttribute),
     SourceFile(SourceFileAttribute),
     BootstrapMethods(BootstrapMethodsAttribute),
     LocalVariableTable(LocalVariableTableAttribute),
+    LocalVariableTypeTable(LocalVariableTypeTableAttribute),
     Signature(SignatureAttribute),
+    EnclosingMethod(EnclosingMethodAttribute),
+    Exceptions(ExceptionsAttribute),
+    StackMapTable(StackMapTableAttribute),
+    ConstantValue(ConstantValueAttribute),
+    Synthetic,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -69,13 +76,52 @@ pub struct SignatureAttribute {
 
 #[derive(Debug, Default, Clone)]
 pub struct LocalVariableTableAttribute {
-    pub local_variable_table: Vec<VariableTableEntry>,
+    pub local_variable_table: Vec<LocalVariableTableEntry>,
 }
 #[derive(Debug, Default, Clone)]
-pub struct VariableTableEntry {
+pub struct LocalVariableTypeTableAttribute {
+    pub local_variable_type_table: Vec<LocalVariableTableEntry>,
+}
+#[derive(Debug, Default, Clone)]
+pub struct LocalVariableTableEntry {
     pub start_pc: u16,
     pub length: u16,
     pub name_index: u16,
-    pub descriptor_index: u16,
+    pub signature_descriptor_index: u16,
     pub index: u16,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct EnclosingMethodAttribute {
+    pub class_index: u16,
+    pub method_index: u16,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ExceptionsAttribute {
+    pub exception_index_table: Vec<u16>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct StackMapTableAttribute {
+    pub entries: Vec<StackMapFrame>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub enum StackMapFrame {
+    #[default]
+    None,
+
+    SameFrame,
+    SameFrameExtended,
+    SameLocalsStackItemFrame,
+    SameLocalsStackItemFrameExtended,
+    ChopFrame,
+    AppendFrame,
+    FullFrame,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ConstantValueAttribute {
+    pub constantvalue_index: u16,
 }
