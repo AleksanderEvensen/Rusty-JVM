@@ -12,7 +12,7 @@ use super::attributes::{
     SignatureAttribute, StackMapTableAttribute,
 };
 #[derive(Debug)]
-pub struct ClassFile {
+pub struct JavaClass {
     pub magic: u32,
     pub minor_version: u16,
     pub major_version: u16,
@@ -26,15 +26,15 @@ pub struct ClassFile {
     pub attributes: Vec<AttributeInfo>,
 }
 
-impl ClassFile {
-    pub fn from_file(path: &PathBuf) -> Result<ClassFile, Box<dyn Error>> {
-        ClassFile::from_bytes(std::fs::read(path)?)
+impl JavaClass {
+    pub fn from_file(path: &PathBuf) -> Result<JavaClass, Box<dyn Error>> {
+        JavaClass::from_bytes(std::fs::read(path)?)
     }
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<ClassFile, Box<dyn Error>> {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<JavaClass, Box<dyn Error>> {
         let mut reader = BinaryReader::from_vec(&bytes);
         reader.set_endian(Endian::Big);
 
-        let mut class = ClassFile {
+        let mut class = JavaClass {
             magic: *reader.read()?,
             minor_version: *reader.read()?,
             major_version: *reader.read()?,
@@ -64,11 +64,11 @@ impl ClassFile {
             attributes: vec![],
         };
 
-        class.fields = ClassFile::parse_fields(&mut reader, &class.constant_pool)?;
+        class.fields = JavaClass::parse_fields(&mut reader, &class.constant_pool)?;
 
-        class.methods = ClassFile::parse_methods(&mut reader, &class.constant_pool)?;
+        class.methods = JavaClass::parse_methods(&mut reader, &class.constant_pool)?;
 
-        class.attributes = ClassFile::parse_attributes(&mut reader, &class.constant_pool)?;
+        class.attributes = JavaClass::parse_attributes(&mut reader, &class.constant_pool)?;
 
         Ok(class)
     }
@@ -105,7 +105,7 @@ impl ClassFile {
                 descriptor_index: *reader.read()?,
                 attributes: vec![],
             };
-            method.attributes = ClassFile::parse_attributes(reader, constant_pool)?;
+            method.attributes = JavaClass::parse_attributes(reader, constant_pool)?;
             methods.push(method);
         }
 
@@ -145,7 +145,7 @@ impl ClassFile {
                         });
                     }
 
-                    let attribute_info = ClassFile::parse_attributes(reader, constant_pool)?;
+                    let attribute_info = JavaClass::parse_attributes(reader, constant_pool)?;
 
                     AttributeInfoData::Code(CodeAttribute {
                         max_stack,
@@ -352,11 +352,24 @@ impl ClassFile {
                 ),
                 name_index: *reader.read()?,
                 descriptor_index: *reader.read()?,
-                attributes: ClassFile::parse_attributes(reader, constant_pool)?,
+                attributes: JavaClass::parse_attributes(reader, constant_pool)?,
             })
         }
 
         Ok(fields)
+    }
+}
+
+impl JavaClass {
+    pub fn get_method_by_name(&self, name: &String) -> Option<&MethodInfo> {
+        self.methods.iter().find(|method| {
+            &self
+                .constant_pool
+                .get_utf8_at(method.name_index)
+                .unwrap()
+                .data
+                == name
+        })
     }
 }
 #[derive(Debug)]

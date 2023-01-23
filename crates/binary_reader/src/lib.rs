@@ -1,6 +1,9 @@
+use rayon::prelude::*;
+
 use std::{
     fs::File,
     io::{Error, ErrorKind, Read},
+    ops::Range,
 };
 
 // use anyhow::{Context, Result};
@@ -11,6 +14,7 @@ pub enum Endian {
     Big,
 }
 
+#[derive(Clone)]
 pub struct BinaryReader {
     /// The buffer
     data: Vec<u8>,
@@ -57,6 +61,7 @@ impl BinaryReader {
         self.offset = offset;
         self
     }
+
     pub fn jump<'a>(&'a mut self, jump_by: usize) -> &'a mut Self {
         self.offset += jump_by;
         self
@@ -72,6 +77,10 @@ impl BinaryReader {
             self.push_offset = None;
         }
         self
+    }
+
+    pub fn get_file_length(&self) -> usize {
+        self.length
     }
 
     pub fn get_current_offset(&self) -> usize {
@@ -110,39 +119,79 @@ impl BinaryReader {
         self.find_from(sequence, 0)
     }
 
+    pub fn find_all_offsets(&self, sequence: &Vec<u8>) -> Vec<usize> {
+        self.find_all_offsets_after(0, sequence)
+    }
+
+    pub fn find_all_offsets_after(&self, start_offset: usize, sequence: &Vec<u8>) -> Vec<usize> {
+        let mut offset = start_offset;
+        let mut found_offsets = vec![];
+        while let Ok(found_offset) = self.find_from(sequence, offset) {
+            found_offsets.push(found_offset);
+
+            offset = found_offset + 1
+        }
+        found_offsets
+    }
+
     pub fn find_from(&self, sequence: &Vec<u8>, mut offset: usize) -> std::io::Result<usize> {
         let bytes = sequence.len();
 
-        while offset + bytes < self.length {
-            let data = self.data.get(offset..offset + bytes).ok_or_else(|| {
-                Error::new(
-                    ErrorKind::UnexpectedEof,
-                    format!("failed to read {} bytes from offset {}", bytes, offset),
-                )
-            })?;
-
-            if sequence[0] == data[0] {
-                let mut is_equal = true;
-                for (i, v) in sequence.iter().enumerate() {
-                    if data[i] != *v {
-                        is_equal = false;
-                    }
-                }
-                if is_equal {
-                    return Ok(offset);
+        'data_loop: while let Some(data) = self.data.get(offset..offset + bytes) {
+            for (i, byte) in data.iter().enumerate() {
+                if sequence[i] != *byte {
+                    offset += 1;
+                    continue 'data_loop;
                 }
             }
-
-            offset += 1;
+            return Ok(offset);
         }
 
-        Err(Error::new(
+        return Err(Error::new(
             ErrorKind::NotFound,
-            format!(
-                "Could not find the sequence {:?} after the offset {:X?}",
-                sequence, self.offset
-            ),
-        ))
+            format!("Could not find the sequence {sequence:?} after the offset {offset:X?}"),
+        ));
+    }
+
+    pub fn find_all_offsets_parallel(&self, sequence: &Vec<u8>) -> Vec<usize> {
+        let thread_count = rayon::current_num_threads();
+
+        let chunks_size = (self.data.len() - sequence.len() + 1) / thread_count;
+
+        let ranges = (0..thread_count)
+            .map(|thread_id| {
+                let start = thread_id * chunks_size;
+                let end = if thread_id == thread_count - 1 {
+                    self.data.len() - 1
+                } else {
+                    start + chunks_size
+                };
+
+                start..end
+            })
+            .collect::<Vec<Range<usize>>>();
+
+        ranges
+            .into_par_iter()
+            .map(|search_range| {
+                let mut offsets = vec![];
+
+                'search_loop: for idx in search_range {
+                    if let Some(data) = self.data.get(idx..idx + sequence.len()) {
+                        for (i, byte) in data.iter().enumerate() {
+                            if sequence[i] != *byte {
+                                continue 'search_loop;
+                            }
+                        }
+
+                        offsets.push(idx);
+                    }
+                }
+
+                offsets
+            })
+            .flatten()
+            .collect::<Vec<usize>>()
     }
 
     pub fn read_string_length<T: FromBinaryReader + Into<usize>>(

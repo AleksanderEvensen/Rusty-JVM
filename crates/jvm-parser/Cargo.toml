@@ -9,3 +9,4 @@ edition = "2021"
 anyhow = "1.0.68"
 binary_reader = { path="../binary_reader" }
 flate2 = { version = "1.0.25", features = ["zlib"] }
+rayon = "1.6.1"

@@ -4,13 +4,14 @@ use std::{error::Error, fs::File, path::PathBuf};
 
 use binary_reader::BinaryReader;
 use flate2::read::DeflateDecoder;
+use rayon::prelude::*;
 
-use crate::classfile::ClassFile;
+use crate::classfile::JavaClass;
 
 #[derive(Debug, Default)]
 pub struct JarFile {
     manifest: JarManifest,
-    classes: HashMap<String, ClassFile>,
+    classes: HashMap<String, JavaClass>,
 }
 
 #[derive(Debug, Default)]
@@ -74,72 +75,102 @@ impl JarFile {
             classes: HashMap::new(),
         };
 
-        while let Ok(offset) = jar_reader.find_next(&central_dir_file_header) {
-            jar_reader.move_to(offset);
+        let cdr_offsets: Vec<usize> =
+            jar_reader.find_all_offsets_parallel(&central_dir_file_header);
 
-            let compressed_size = *jar_reader.jump(20).read::<u32>()? as usize;
-            let file_name_length = *jar_reader.jump(4).read::<u16>()? as usize;
+        let java_class_bytes: Vec<Vec<u8>> = cdr_offsets
+            .iter()
+            .filter_map(|file_offset| {
+                jar_reader.move_to(*file_offset);
 
-            // The file offset + the fields we don't care about
-            let file_data_offset = *jar_reader.jump(12).read::<u32>()? as usize;
+                let (file_name, bytes) = read_cdr_file_bytes(&mut jar_reader).unwrap();
 
-            // Read the file name
-            let file_name = jar_reader.read_string(file_name_length)?;
-
-            // Store the offset, that way we can move back
-            let old_offset = jar_reader.get_current_offset();
-
-            // Move to the file entry
-            jar_reader.move_to(file_data_offset);
-
-            let compression_method = *jar_reader.jump(8).read::<u16>()?;
-
-            // Read the amount of extra fields
-            let extra_field_length = *jar_reader.jump(18).read::<u16>()? as usize;
-
-            // Read the deflated bytes
-            let data = jar_reader
-                .jump(file_name_length + extra_field_length)
-                .read_bytes(compressed_size as usize)?;
-
-            // Go back to the Central Dir Entry
-            jar_reader.move_to(old_offset);
-
-            if file_name == "META-INF/MANIFEST.MF" {
-                match compression_method {
-                    0 => jar_file.manifest = JarManifest::from_bytes(&data),
-                    8 => jar_file.manifest = JarManifest::from_deflated_bytes(&data),
-                    unknown_method => todo!("Zip Decompression method for id: {unknown_method}"),
+                if file_name == "META-INF/MANIFEST.MF" {
+                    jar_file.manifest = JarManifest::from_bytes(&bytes);
+                    return None;
+                } else if file_name.ends_with(".class") {
+                    return Some(bytes);
+                } else {
+                    return None;
                 }
-            } else if file_name.ends_with(".class") {
-                let bytes = match compression_method {
-                    0 => data,
-                    8 => {
-                        let mut decoder = DeflateDecoder::new(data.as_slice());
-                        let mut buffer = vec![];
-                        decoder.read_to_end(&mut buffer).unwrap();
-                        buffer
-                    }
-                    unknown_method => todo!("Zip Decompression method for id: {unknown_method}"),
-                };
-                let class_file = ClassFile::from_bytes(bytes).unwrap();
-                let class = class_file
+            })
+            .collect();
+
+        jar_file.classes = java_class_bytes
+            .into_par_iter()
+            .map(|bytes| {
+                let java_class = JavaClass::from_bytes(bytes).unwrap();
+
+                let class = java_class
                     .constant_pool
-                    .get_class_at(class_file.this_class)
+                    .get_class_at(java_class.this_class)
                     .unwrap();
 
-                let name = class_file
+                let name = java_class
                     .constant_pool
                     .get_utf8_at(class.name_index)
                     .unwrap()
                     .data
                     .clone();
-                println!("Adding the class '{}' to the class map", name);
-                jar_file.classes.insert(name, class_file);
-            } else {
-                println!("Ignore: {}", file_name);
-            }
-        }
+
+                (name, java_class)
+            })
+            // .inspect(|(class, _)| println!("The class '{class}' was parsed"))
+            .collect();
+
         Ok(jar_file)
+    }
+}
+
+fn read_cdr_file_bytes(reader: &mut BinaryReader) -> std::io::Result<(String, Vec<u8>)> {
+    let compressed_size = *reader.jump(20).read::<u32>()? as usize;
+
+    let file_name_length = *reader.jump(4).read::<u16>()? as usize;
+
+    // The file offset + the fields we don't care about
+    let file_data_offset = *reader.jump(12).read::<u32>()? as usize;
+
+    // Read the file name
+    let file_name = reader.read_string(file_name_length)?;
+
+    // Move to the file entry
+    reader.move_to(file_data_offset);
+
+    let compression_method = *reader.jump(8).read::<u16>()? as usize;
+
+    // Read the amount of extra fields
+    let extra_field_length = *reader.jump(18).read::<u16>()? as usize;
+
+    // Read the deflated bytes
+    let data = reader
+        .jump(file_name_length + extra_field_length)
+        .read_bytes(compressed_size)?;
+
+    let data = match compression_method {
+        0 => data,
+
+        8 => {
+            let mut decoder = DeflateDecoder::new(data.as_slice());
+            let mut buffer = vec![];
+            decoder.read_to_end(&mut buffer).unwrap();
+            buffer
+        }
+        not_impl_comp_method => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("The the compression method {not_impl_comp_method} is not implemented yet, consider adding it"),
+            ));
+        }
+    };
+
+    Ok((file_name, data))
+}
+
+impl JarFile {
+    pub fn get_main_class(&self) -> Option<&JavaClass> {
+        let Some(main_class) = &self.manifest.main_class else {
+        	return None;
+        };
+        self.classes.get(main_class)
     }
 }

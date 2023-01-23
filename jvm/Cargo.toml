@@ -12,3 +12,4 @@ jvm_parser = { path = "../crates/jvm-parser" }
 
 [features]
 debug = []
+

@@ -1,8 +1,9 @@
-// mod jvm;
+mod jvm;
 mod utils;
 
 use clap::Parser;
-use jvm_parser::{classfile::ClassFile, jar::JarFile};
+use jvm::JVM;
+use jvm_parser::{classfile::JavaClass, jar::JarFile};
 use std::path::PathBuf;
 
 #[macro_export]
@@ -29,17 +30,18 @@ fn main() {
 
     let file = args
         .path
-        .or_else(|| Some(PathBuf::from("./java/jvm-test.jar")))
+        // .or_else(|| Some(PathBuf::from("./java/jvm-test.jar")))
+        .or_else(|| Some(PathBuf::from("./rt.jar")))
         .unwrap();
 
-    println!("File: {:?}", file);
-    // println!("Ext: {:?}",);
+    let mut jvm = JVM::new();
 
     let file_ext = file.extension().unwrap();
-
     if file_ext == "class" {
-        let _ = ClassFile::from_file(&file).unwrap();
+        jvm.add_class(JavaClass::from_file(&file).unwrap()).unwrap();
     } else if file_ext == "jar" || file_ext == "zip" {
-        let _ = JarFile::from_file(&file).unwrap();
+        jvm.add_jar(JarFile::from_file(&file).unwrap());
     }
+
+    jvm.run();
 }

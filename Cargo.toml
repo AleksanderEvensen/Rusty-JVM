@@ -5,3 +5,5 @@ members = [
 	"jvm",
 ]
 
+[profile.release] 
+debug = true

@@ -2,7 +2,7 @@ pub mod opcodes;
 
 use std::collections::HashMap;
 
-use jvm_parser::classfile::ClassFile;
+use jvm_parser::{classfile::JavaClass, jar::JarFile};
 // use jvm_parser::ClassFile;
 
 #[allow(dead_code)]
@@ -26,52 +26,37 @@ pub struct JavaObjectRef {
 }
 
 pub struct JVM {
-    // class_file: ClassFile,
-    class_files: HashMap<String, ClassFile>,
+    classes: HashMap<String, JavaClass>,
 }
 
 impl JVM {
     pub fn new() -> Self {
         Self {
-            class_files: HashMap::new(),
+            classes: HashMap::new(),
         }
     }
 
-    pub fn add_class_file(&mut self, class_file: ClassFile) -> &mut Self {
-        println!("ClassFile: {:#?}", class_file);
+    pub fn add_class(&mut self, java_class: JavaClass) -> Result<(), String> {
+        // println!("ClassFile: {java_class:#?}");
 
-        // let class = class_file
-        //     .constant_pool
-        //     .get_class_at(class_file.this_class)
-        //     .unwrap();
-        // let class_name = class_file
-        //     .constant_pool
-        //     .get_utf8_at(class.name_index)
-        //     .unwrap()
-        //     .data
-        //     .clone();
+        let Some(cp_class) = java_class.constant_pool.get_class_at(java_class.this_class) else {
+			return Err(format!("No class constant pool entry at location {}, found: {:?}", java_class.this_class, java_class.constant_pool.get_at(java_class.this_class)));
+		};
 
-        // self.class_files.insert(class_name, class_file);
+        let Some(class_name) = java_class.constant_pool.get_utf8_at(cp_class.name_index) else {
+			return Err(format!("No Utf8 constant pool entry at location {}, found: {:?}", cp_class.name_index, java_class.constant_pool.get_at(cp_class.name_index)));
+		};
 
-        // println!("ClassName: {}", class_name);
-
-        self
+        Ok(())
     }
 
-    pub fn run(&mut self) {
-        // self.class_files.iter().find(|class_file| {
-        //     // class_file.
-        // });
+    pub fn add_jar(&mut self, jar_file: JarFile) {
+        // println!("JarFile: {jar_file:#?}");
     }
+
+    pub fn run(&mut self) {}
 
     /*
-    pub fn get_main(&self) -> Result<(&MethodInfo, CodeAttribute), String> {
-        if let Some((method, code_attribute)) = self.class_file.get_main_method() {
-            return Ok((method, code_attribute));
-        } else {
-            return Err("Class File doesn't contain main method".to_string());
-        }
-    }
 
     pub fn execute_code(&self, _method: &MethodInfo, code_data: CodeAttribute) {
         let mut bytes = code_data.code;
