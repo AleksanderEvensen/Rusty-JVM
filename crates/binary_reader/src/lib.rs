@@ -112,6 +112,14 @@ impl BinaryReader {
         Ok(data.to_vec())
     }
 
+    pub fn read_rest(&mut self) -> std::io::Result<Vec<u8>> {
+        Ok(self.read_bytes(self.data.len() - self.offset)?)
+    }
+
+    pub fn peak_rest(&self) -> std::io::Result<Vec<u8>> {
+        Ok(self.peak_bytes(self.data.len() - self.offset)?)
+    }
+
     pub fn find_next(&self, sequence: &Vec<u8>) -> std::io::Result<usize> {
         self.find_from(sequence, self.offset.clone())
     }
@@ -223,20 +231,37 @@ impl BinaryReader {
     }
 
     pub fn read<T: FromBinaryReader>(&mut self) -> std::io::Result<Box<T>> {
-        T::from_byte_reader(self)
+        T::read_from_byte_reader(self)
+    }
+
+    pub fn peak<T: FromBinaryReader>(&mut self) -> std::io::Result<Box<T>> {
+        T::peak_from_byte_reader(self)
     }
 }
 
 pub trait FromBinaryReader {
-    fn from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<Self>>;
+    fn read_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<Self>>;
+    fn peak_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<Self>>;
 }
 
 macro_rules! impl_from_binary_reader {
     ($ty:ident, $bytes:expr) => {
         impl FromBinaryReader for $ty {
-            fn from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<$ty>> {
+            fn read_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<$ty>> {
                 let endian = reader.endian.clone();
                 let data = reader.read_bytes($bytes)?;
+                match endian {
+                    Endian::Little => Ok(Box::new($ty::from_le_bytes(
+                        data[..$bytes].try_into().unwrap(),
+                    ))),
+                    Endian::Big => Ok(Box::new($ty::from_be_bytes(
+                        data[..$bytes].try_into().unwrap(),
+                    ))),
+                }
+            }
+            fn peak_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<$ty>> {
+                let endian = reader.endian.clone();
+                let data = reader.peak_bytes($bytes)?;
                 match endian {
                     Endian::Little => Ok(Box::new($ty::from_le_bytes(
                         data[..$bytes].try_into().unwrap(),
