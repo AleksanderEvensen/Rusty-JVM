@@ -68,6 +68,23 @@ impl ConstantPool {
         }
         None
     }
+    pub fn get_refs_ext_at(
+        &self,
+        index: u16,
+    ) -> Option<(&CpInfoRefs, &CpInfoClass, &CpInfoNameAndType)> {
+        if let Some(cp_ref) = self.get_refs_at(index) {
+            let Some(class) = self.get_class_at(cp_ref.class_index) else {
+				return None;
+			};
+            let Some(name_and_type) = self.get_name_type_at(cp_ref.name_and_type_index) else {
+				return None;
+			};
+
+            return Some((cp_ref, class, name_and_type));
+        }
+
+        None
+    }
 
     pub fn get_name_type_at(&self, index: u16) -> Option<&CpInfoNameAndType> {
         if let CpInfo::NameAndType(name_type) = self.get_at(index).unwrap() {

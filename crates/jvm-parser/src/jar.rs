@@ -10,8 +10,8 @@ use crate::classfile::JavaClass;
 
 #[derive(Debug, Default)]
 pub struct JarFile {
-    manifest: JarManifest,
-    classes: HashMap<String, JavaClass>,
+    pub manifest: JarManifest,
+    pub classes: HashMap<String, JavaClass>,
 }
 
 #[derive(Debug, Default)]
