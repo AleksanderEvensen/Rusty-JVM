@@ -1,7 +1,14 @@
-#![allow(unused)]
 use std::str::Chars;
-#[derive(Debug, PartialEq, Eq)]
 
+pub fn match_flag<T>(value: T, mask: T) -> bool
+where
+    T: std::ops::BitAnd + core::cmp::PartialEq + Copy,
+    <T as std::ops::BitAnd>::Output: PartialEq<T>,
+{
+    value & mask == mask
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum DescriptorTypes {
     Void,
     Byte,
