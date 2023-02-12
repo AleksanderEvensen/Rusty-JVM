@@ -11,6 +11,49 @@ use super::attributes::{
     LocalVariableTableAttribute, LocalVariableTableEntry, LocalVariableTypeTableAttribute,
     SignatureAttribute, StackMapTableAttribute,
 };
+
+type AccessFlags = u16;
+
+#[allow(non_snake_case)]
+pub mod ClassAccessFlags {
+    pub const ACC_PUBLIC: u16 = 0x001;
+    pub const ACC_FINAL: u16 = 0x0010;
+    pub const ACC_SUPER: u16 = 0x0020;
+    pub const ACC_INTERFACE: u16 = 0x0200;
+    pub const ACC_ABSTRACT: u16 = 0x0040;
+    pub const ACC_SYNTHETIC: u16 = 0x1000;
+    pub const ACC_ANNOTATION: u16 = 0x2000;
+    pub const ACC_ENUM: u16 = 0x4000;
+}
+
+#[allow(non_snake_case)]
+pub mod MethodAccessFlags {
+    pub const ACC_PUBLIC: u16 = 0x0001;
+    pub const ACC_PRIVATE: u16 = 0x0002;
+    pub const ACC_PROTECTED: u16 = 0x0004;
+    pub const ACC_STATIC: u16 = 0x0008;
+    pub const ACC_FINAL: u16 = 0x0010;
+    pub const ACC_SYNCHRONIZED: u16 = 0x0020;
+    pub const ACC_BRIDGE: u16 = 0x0040;
+    pub const ACC_VARARGS: u16 = 0x0080;
+    pub const ACC_NATIVE: u16 = 0x0100;
+    pub const ACC_ABSTRACT: u16 = 0x0400;
+    pub const ACC_STRICT: u16 = 0x0800;
+    pub const ACC_SYNTHETIC: u16 = 0x1000;
+}
+
+#[allow(non_snake_case)]
+pub mod FieldAccessFlags {
+    pub const ACC_PUBLIC: u16 = 0x0001;
+    pub const ACC_PRIVATE: u16 = 0x0002;
+    pub const ACC_PROTECTED: u16 = 0x0004;
+    pub const ACC_STATIC: u16 = 0x0008;
+    pub const ACC_FINAL: u16 = 0x0010;
+    pub const ACC_VOLATILE: u16 = 0x0040;
+    pub const ACC_TRANSIENT: u16 = 0x0080;
+    pub const ACC_SYNTHETIC: u16 = 0x1000;
+    pub const ACC_ENUM: u16 = 0x4000;
+}
 #[derive(Debug)]
 pub struct JavaClass {
     pub magic: u32,
@@ -39,21 +82,7 @@ impl JavaClass {
             minor_version: *reader.read()?,
             major_version: *reader.read()?,
             constant_pool: ConstantPool::from_reader(&mut reader)?,
-            access_flags: AccessFlags {
-                flags: parse_flags(
-                    *reader.read()?,
-                    vec![
-                        (0x001, "ACC_PUBLIC"),
-                        (0x0010, "ACC_FINAL"),
-                        (0x0020, "ACC_SUPER"),
-                        (0x0020, "ACC_INTERFACE"),
-                        (0x0040, "ACC_ABSTRACT"),
-                        (0x1000, "ACC_SYNTHETIC"),
-                        (0x2000, "ACC_ANNOTATION"),
-                        (0x4000, "ACC_ENUM"),
-                    ],
-                ),
-            },
+            access_flags: *reader.read()?,
             this_class: *reader.read()?,
             super_class: *reader.read()?,
             interfaces: (0..*reader.read::<u16>()?)
@@ -82,25 +111,7 @@ impl JavaClass {
 
         for _ in 0..method_count as usize {
             let mut method = MethodInfo {
-                access_flags: AccessFlags {
-                    flags: parse_flags(
-                        *reader.read()?,
-                        vec![
-                            (0x0001, "ACC_PUBLIC"),
-                            (0x0002, "ACC_PRIVATE"),
-                            (0x0004, "ACC_PROTECTED"),
-                            (0x0008, "ACC_STATIC"),
-                            (0x0010, "ACC_FINAL"),
-                            (0x0020, "ACC_SYNCHRONIZED"),
-                            (0x0040, "ACC_BRIDGE"),
-                            (0x0080, "ACC_VARARGS"),
-                            (0x0100, "ACC_NATIVE"),
-                            (0x0400, "ACC_ABSTRACT"),
-                            (0x0800, "ACC_STRICT"),
-                            (0x1000, "ACC_SYNTHETIC"),
-                        ],
-                    ),
-                },
+                access_flags: *reader.read()?,
                 name_index: *reader.read()?,
                 descriptor_index: *reader.read()?,
                 attributes: vec![],
@@ -336,20 +347,7 @@ impl JavaClass {
         let mut fields = vec![];
         for _ in 0..field_count {
             fields.push(FieldInfo {
-                access_flags: parse_flags(
-                    *reader.read()?,
-                    vec![
-                        (0x0001, "ACC_PUBLIC"),
-                        (0x0002, "ACC_PRIVATE"),
-                        (0x0004, "ACC_PROTECTED"),
-                        (0x0008, "ACC_STATIC"),
-                        (0x0010, "ACC_FINAL"),
-                        (0x0040, "ACC_VOLATILE"),
-                        (0x0080, "ACC_TRANSIENT"),
-                        (0x1000, "ACC_SYNTHETIC"),
-                        (0x4000, "ACC_ENUM"),
-                    ],
-                ),
+                access_flags: *reader.read()?,
                 name_index: *reader.read()?,
                 descriptor_index: *reader.read()?,
                 attributes: JavaClass::parse_attributes(reader, constant_pool)?,
@@ -372,10 +370,6 @@ impl JavaClass {
         })
     }
 }
-#[derive(Debug)]
-pub struct AccessFlags {
-    pub flags: Vec<&'static str>,
-}
 
 #[derive(Debug)]
 pub struct MethodInfo {
@@ -385,19 +379,9 @@ pub struct MethodInfo {
     pub attributes: Vec<AttributeInfo>,
 }
 
-fn parse_flags<T>(value: u16, masks: Vec<(u16, T)>) -> Vec<T> {
-    let mut matching_flags = vec![];
-    for mask in masks {
-        if (value & mask.0.to_owned()) != 0 {
-            matching_flags.push(mask.1);
-        }
-    }
-    return matching_flags;
-}
-
 #[derive(Debug)]
 pub struct FieldInfo {
-    pub access_flags: Vec<&'static str>,
+    pub access_flags: AccessFlags,
     pub name_index: u16,
     pub descriptor_index: u16,
     pub attributes: Vec<AttributeInfo>,
