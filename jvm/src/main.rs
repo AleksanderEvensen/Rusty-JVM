@@ -30,18 +30,18 @@ fn main() {
 
     let file = args
         .path
-        // .or_else(|| Some(PathBuf::from("./java/jvm-test.jar")))
-        .or_else(|| Some(PathBuf::from("./rt.jar")))
+        .or_else(|| Some(PathBuf::from("./java/jvm-test.jar")))
         .unwrap();
 
     let mut jvm = JVM::new();
 
     let file_ext = file.extension().unwrap();
+
     if file_ext == "class" {
         jvm.add_class(JavaClass::from_file(&file).unwrap()).unwrap();
     } else if file_ext == "jar" || file_ext == "zip" {
-        jvm.add_jar(JarFile::from_file(&file).unwrap());
+        jvm.add_jar(JarFile::from_file(&file).unwrap()).unwrap();
     }
 
-    jvm.run();
+    jvm.run().unwrap();
 }
