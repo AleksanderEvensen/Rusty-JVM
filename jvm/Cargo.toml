@@ -6,11 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.68"
+anyhow = { workspace = true }
 clap = { version = "4.0.18", features = ["derive"] }
 jvm_parser = { path = "../crates/jvm-parser" }
 binary_reader = { path = "../crates/binary_reader" }
 
 [features]
 debug = []
-

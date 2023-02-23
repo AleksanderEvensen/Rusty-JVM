@@ -5,5 +5,10 @@ members = [
 	"jvm",
 ]
 
+[workspace.dependencies]
+anyhow = "1.0"
+rayon = "1.6"
+
+
 [profile.release] 
 debug = true
