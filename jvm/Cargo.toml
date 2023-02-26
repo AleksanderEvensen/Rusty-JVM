@@ -10,6 +10,7 @@ anyhow = { workspace = true }
 clap = { version = "4.0.18", features = ["derive"] }
 jvm_parser = { path = "../crates/jvm-parser" }
 binary_reader = { path = "../crates/binary_reader" }
+class-parser = { path = "../crates/class-parser" }
 
 [features]
 debug = []

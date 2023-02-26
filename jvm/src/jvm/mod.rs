@@ -15,7 +15,7 @@ use jvm_parser::{
 
 use crate::{
     jvm::opcodes::OpCodes,
-    utils::{match_flag, parse_descriptor},
+    utils::{match_flag, parse_descriptor, Descriptor, DescriptorTypes, DescriptorValues},
 };
 // use jvm_parser::ClassFile;
 
@@ -42,13 +42,36 @@ pub struct JavaObjectRef {
 pub struct JVM {
     classes: HashMap<String, JavaClass>,
     main_method_class: Option<String>,
+    native_methods: HashMap<&'static str, Box<dyn Fn(Vec<StackValue>, Descriptor) -> StackValue>>,
 }
 
 impl JVM {
     pub fn new() -> Self {
+        let mut natives: HashMap<
+            &'static str,
+            Box<dyn Fn(Vec<StackValue>, Descriptor) -> StackValue>,
+        > = HashMap::new();
+        natives.insert(
+            "com/ahse/jvm/Main;print",
+            Box::new(|args, descriptor| match descriptor {
+                Descriptor {
+                    return_value: DescriptorTypes::Void,
+                    parameters: _,
+                } => {
+                    println!("{:?}", args.get(0).unwrap());
+                    StackValue::None
+                }
+
+                _ => {
+                    todo!("Implement this");
+                }
+            }),
+        );
+
         Self {
             classes: HashMap::new(),
             main_method_class: None,
+            native_methods: natives,
         }
     }
 
@@ -197,7 +220,7 @@ impl JVM {
         while let Ok(opcode_byte) = reader.read::<u8>() {
             let opcode_byte = *opcode_byte;
             let opcode = OpCodes::from(opcode_byte);
-            println!("[Executing Opcode : {opcode:?}]]");
+            println!("[Executing Opcode : {opcode:?}]");
 
             match opcode {
                 OpCodes::ldc => {
@@ -227,8 +250,6 @@ impl JVM {
 
                 OpCodes::invokestatic => {
                     let index: u16 = *reader.read().unwrap();
-
-                    println!("Index: {index}");
 
                     let (_, class, name_type) =
                         java_class.constant_pool.get_refs_ext_at(index).unwrap();
@@ -266,17 +287,26 @@ impl JVM {
                     ) {
                         todo!("Implement the seperate logic when executing native and synchronized: https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-6.html#jvms-6.5.invokestatic")
                     } else if method.access_flags & MethodAccessFlags::ACC_NATIVE as u16 != 0 {
-                        println!("[Invokenative]");
+                        // println!("[Invokenative]");
+
+                        self.native_methods
+                            .get(format!("{class_name};{function_name}").as_str())
+                            .unwrap()(
+                            vec![StackValue::String("Hello World, Hardcoded".to_string())],
+                            descriptor,
+                        );
                     } else {
                         todo!("Implement logic for invoking static functions for a specified class")
                     }
 
-                    println!(
-                        "[OpCodes : invokestatic] Invoking {:#?}",
-                        (&class_name, &function_name, &descriptor)
-                    );
+                    // println!(
+                    //     "[OpCodes : invokestatic] Invoking {:#?}",
+                    //     (&class_name, &function_name, &descriptor)
+                    // );
                 }
 
+                OpCodes::Return => { /* for now, just don't do shit */ }
+                OpCodes::nop => { /* this is meant to be empty */ }
                 unknown_opcode => {
                     panic!(
                         "The OpCode ( {} : {:?} ) is not imeplemented",

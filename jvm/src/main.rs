@@ -26,22 +26,28 @@ struct Args {
 }
 
 fn main() {
-    let args = Args::parse();
+    let bytes = std::fs::read(PathBuf::from("./java/out/com/ahse/jvm/Main.class")).unwrap();
 
-    let file = args
-        .path
-        .or_else(|| Some(PathBuf::from("./java/jvm-test.jar")))
-        .unwrap();
+    let (_, data) = class_parser::parse(&bytes[..]).unwrap();
 
-    let mut jvm = JVM::new();
+    println!("{data:#?}");
 
-    let file_ext = file.extension().unwrap();
+    // let args = Args::parse();
 
-    if file_ext == "class" {
-        jvm.add_class(JavaClass::from_file(&file).unwrap()).unwrap();
-    } else if file_ext == "jar" || file_ext == "zip" {
-        jvm.add_jar(JarFile::from_file(&file).unwrap()).unwrap();
-    }
+    // let file = args
+    //     .path
+    //     .or_else(|| Some(PathBuf::from("./java/jvm-test.jar")))
+    //     .unwrap();
 
-    jvm.run().unwrap();
+    // let mut jvm = JVM::new();
+
+    // let file_ext = file.extension().unwrap();
+
+    // if file_ext == "class" {
+    //     jvm.add_class(JavaClass::from_file(&file).unwrap()).unwrap();
+    // } else if file_ext == "jar" || file_ext == "zip" {
+    //     jvm.add_jar(JarFile::from_file(&file).unwrap()).unwrap();
+    // }
+
+    // jvm.run().unwrap();
 }
