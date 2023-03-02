@@ -26,11 +26,36 @@ struct Args {
 }
 
 fn main() {
-    let bytes = std::fs::read(PathBuf::from("./java/out/com/ahse/jvm/Main.class")).unwrap();
+    let big_bytes = std::fs::read(PathBuf::from("./java/out/com/ahse/jvm/Main.class")).unwrap();
+    // let big_bytes = std::fs::read(PathBuf::from("./ORBUtilSystemException.class")).unwrap();
 
-    let (_, data) = class_parser::parse(&bytes[..]).unwrap();
+    let iters = 100;
 
-    println!("{data:#?}");
+    println!("Benching the nom implementation");
+    let start = std::time::Instant::now();
+    for _ in 0..iters {
+        class_parser::parse(&big_bytes[..]).unwrap();
+    }
+    let delta = std::time::Instant::now() - start;
+    println!(
+        "Results for 'nom': {}s on {iters} iterations",
+        delta.as_secs_f64()
+    );
+
+    println!("Benching the \"old\" implementation");
+    let start = std::time::Instant::now();
+    for _ in 0..iters {
+        JavaClass::from_bytes(&big_bytes).unwrap();
+    }
+    let delta = std::time::Instant::now() - start;
+    println!(
+        "Results for 'old': {}s on {iters} iterations",
+        delta.as_secs_f64()
+    );
+
+    // let (_, data) = class_parser::parse(&bytes[..]).unwrap();
+
+    // println!("{data:#?}");
 
     // let args = Args::parse();
 
