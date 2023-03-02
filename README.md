@@ -10,7 +10,7 @@ Not All java features are implemented (obviously).
 jvm.exe --path "<path_to_file>.(jar|class)"
 ```
 
-Everything needed to implement, is written in thew oracle documentation:
+Everything needed to implement, is written in the oracle documentation:
 
 [Oracle: The `class` File Format](https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-4.html)
 
