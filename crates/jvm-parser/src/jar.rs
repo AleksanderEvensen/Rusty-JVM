@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::{error::Error, fs::File, path::PathBuf};
 
-use binary_reader::BinaryReader;
+use byte_reader::ByteReader;
 use flate2::read::DeflateDecoder;
 use rayon::prelude::*;
 
@@ -66,7 +66,7 @@ impl JarManifest {
 
 impl JarFile {
     pub fn from_file(path: &PathBuf) -> Result<JarFile, Box<dyn Error>> {
-        let mut jar_reader = BinaryReader::from_file(&mut File::open(path)?)?;
+        let mut jar_reader = ByteReader::from_file(&mut File::open(path)?)?;
 
         let central_dir_file_header = vec![0x50, 0x4B, 0x01, 0x02];
 
@@ -99,7 +99,7 @@ impl JarFile {
         jar_file.classes = java_class_bytes
             .into_par_iter()
             .map(|bytes| {
-                let java_class = JavaClass::from_bytes(bytes).unwrap();
+                let java_class = JavaClass::from_bytes(&bytes).unwrap();
 
                 let class = java_class
                     .constant_pool
@@ -122,13 +122,13 @@ impl JarFile {
     }
 }
 
-fn read_cdr_file_bytes(reader: &mut BinaryReader) -> std::io::Result<(String, Vec<u8>)> {
-    let compressed_size = *reader.jump(20).read::<u32>()? as usize;
+fn read_cdr_file_bytes(reader: &mut ByteReader) -> std::io::Result<(String, Vec<u8>)> {
+    let compressed_size = reader.jump(20).read::<u32>()? as usize;
 
-    let file_name_length = *reader.jump(4).read::<u16>()? as usize;
+    let file_name_length = reader.jump(4).read::<u16>()? as usize;
 
     // The file offset + the fields we don't care about
-    let file_data_offset = *reader.jump(12).read::<u32>()? as usize;
+    let file_data_offset = reader.jump(12).read::<u32>()? as usize;
 
     // Read the file name
     let file_name = reader.read_string(file_name_length)?;
@@ -136,10 +136,10 @@ fn read_cdr_file_bytes(reader: &mut BinaryReader) -> std::io::Result<(String, Ve
     // Move to the file entry
     reader.move_to(file_data_offset);
 
-    let compression_method = *reader.jump(8).read::<u16>()? as usize;
+    let compression_method = reader.jump(8).read::<u16>()? as usize;
 
     // Read the amount of extra fields
-    let extra_field_length = *reader.jump(18).read::<u16>()? as usize;
+    let extra_field_length = reader.jump(18).read::<u16>()? as usize;
 
     // Read the deflated bytes
     let data = reader

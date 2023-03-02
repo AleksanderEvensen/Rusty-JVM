@@ -3,7 +3,7 @@ use crate::classfile::attributes::{
     ExceptionTable, LineNumber, LineNumberTableAttribute, SourceFileAttribute,
 };
 use crate::classfile::constant_pool::ConstantPool;
-use binary_reader::{BinaryReader, Endian};
+use byte_reader::{ByteReader, Endian};
 use std::{error::Error, path::PathBuf};
 
 use super::attributes::{
@@ -71,22 +71,22 @@ pub struct JavaClass {
 
 impl JavaClass {
     pub fn from_file(path: &PathBuf) -> Result<JavaClass, Box<dyn Error>> {
-        JavaClass::from_bytes(std::fs::read(path)?)
+        JavaClass::from_bytes(&std::fs::read(path)?)
     }
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<JavaClass, Box<dyn Error>> {
-        let mut reader = BinaryReader::from_vec(&bytes);
+    pub fn from_bytes(bytes: &Vec<u8>) -> Result<JavaClass, Box<dyn Error>> {
+        let mut reader = ByteReader::from_vec(bytes);
         reader.set_endian(Endian::Big);
 
         let mut class = JavaClass {
-            magic: *reader.read()?,
-            minor_version: *reader.read()?,
-            major_version: *reader.read()?,
+            magic: reader.read()?,
+            minor_version: reader.read()?,
+            major_version: reader.read()?,
             constant_pool: ConstantPool::from_reader(&mut reader)?,
-            access_flags: *reader.read()?,
-            this_class: *reader.read()?,
-            super_class: *reader.read()?,
-            interfaces: (0..*reader.read::<u16>()?)
-                .map(|_| *reader.read::<u16>().unwrap())
+            access_flags: reader.read()?,
+            this_class: reader.read()?,
+            super_class: reader.read()?,
+            interfaces: (0..reader.read::<u16>()?)
+                .map(|_| reader.read::<u16>().unwrap())
                 .collect::<Vec<u16>>(),
             fields: vec![],
             methods: vec![],
@@ -103,17 +103,17 @@ impl JavaClass {
     }
 
     fn parse_methods(
-        reader: &mut BinaryReader,
+        reader: &mut ByteReader,
         constant_pool: &ConstantPool,
     ) -> Result<Vec<MethodInfo>, Box<dyn Error>> {
-        let method_count: u16 = *reader.read()?;
+        let method_count: u16 = reader.read()?;
         let mut methods = vec![];
 
         for _ in 0..method_count as usize {
             let mut method = MethodInfo {
-                access_flags: *reader.read()?,
-                name_index: *reader.read()?,
-                descriptor_index: *reader.read()?,
+                access_flags: reader.read()?,
+                name_index: reader.read()?,
+                descriptor_index: reader.read()?,
                 attributes: vec![],
             };
             method.attributes = JavaClass::parse_attributes(reader, constant_pool)?;
@@ -124,35 +124,35 @@ impl JavaClass {
     }
 
     fn parse_attributes(
-        reader: &mut BinaryReader,
+        reader: &mut ByteReader,
         constant_pool: &ConstantPool,
     ) -> Result<Vec<AttributeInfo>, Box<dyn Error>> {
-        let attribute_count: u16 = *reader.read()?;
+        let attribute_count: u16 = reader.read()?;
         let mut attributes = vec![];
 
         #[allow(unused_variables)]
         for i in 0..attribute_count.to_owned() as usize {
-            let attribute_name_index = *reader.read()?;
-            let attribute_length = *reader.read::<u32>()?;
+            let attribute_name_index = reader.read()?;
+            let attribute_length = reader.read::<u32>()?;
 
             let attribute_tag = constant_pool.get_utf8_at(attribute_name_index).unwrap();
 
             let attribute = match attribute_tag.data.as_str() {
                 "Code" => {
-                    let max_stack = *reader.read()?;
-                    let max_locals = *reader.read()?;
-                    let code_length: u32 = *reader.read()?;
+                    let max_stack = reader.read()?;
+                    let max_locals = reader.read()?;
+                    let code_length: u32 = reader.read()?;
                     let code = reader.read_bytes(code_length as usize)?;
-                    let exception_table_length: u16 = *reader.read()?;
+                    let exception_table_length: u16 = reader.read()?;
 
                     let mut exception_table = vec![];
 
                     for _ in 0..exception_table_length as usize {
                         exception_table.push(ExceptionTable {
-                            start_pc: *reader.read()?,
-                            end_pc: *reader.read()?,
-                            handler_pc: *reader.read()?,
-                            catch_type: *reader.read()?,
+                            start_pc: reader.read()?,
+                            end_pc: reader.read()?,
+                            handler_pc: reader.read()?,
+                            catch_type: reader.read()?,
                         });
                     }
 
@@ -168,13 +168,13 @@ impl JavaClass {
                 }
 
                 "LineNumberTable" => {
-                    let line_number_table_length: u16 = *reader.read()?;
+                    let line_number_table_length: u16 = reader.read()?;
                     let mut line_number_table = vec![];
 
                     for _ in 0..line_number_table_length as usize {
                         line_number_table.push(LineNumber {
-                            start_pc: *reader.read()?,
-                            line_number: *reader.read()?,
+                            start_pc: reader.read()?,
+                            line_number: reader.read()?,
                         })
                     }
 
@@ -184,20 +184,20 @@ impl JavaClass {
                 }
 
                 "SourceFile" => AttributeInfoData::SourceFile(SourceFileAttribute {
-                    sourcefile_index: *reader.read()?,
+                    sourcefile_index: reader.read()?,
                 }),
 
                 "BootstrapMethods" => {
-                    let num_bootstrap_methods: u16 = *reader.read()?;
+                    let num_bootstrap_methods: u16 = reader.read()?;
                     let mut bootstrap_methods = vec![];
 
                     for _ in 0..num_bootstrap_methods as usize {
-                        let bootstrap_method_ref = *reader.read()?;
-                        let num_bootstrap_arguments: u16 = *reader.read()?;
+                        let bootstrap_method_ref = reader.read()?;
+                        let num_bootstrap_arguments: u16 = reader.read()?;
                         let mut bootstrap_arguments = vec![];
 
                         for _ in 0..num_bootstrap_arguments as usize {
-                            let arg_index = *reader.read()?;
+                            let arg_index = reader.read()?;
                             bootstrap_arguments.push(arg_index);
                         }
 
@@ -214,12 +214,12 @@ impl JavaClass {
                 }
 
                 "Signature" => AttributeInfoData::Signature(SignatureAttribute {
-                    signature_index: *reader.read().unwrap(),
+                    signature_index: reader.read().unwrap(),
                 }),
 
                 "EnclosingMethod" => AttributeInfoData::EnclosingMethod(EnclosingMethodAttribute {
-                    class_index: *reader.read().unwrap(),
-                    method_index: *reader.read().unwrap(),
+                    class_index: reader.read().unwrap(),
+                    method_index: reader.read().unwrap(),
                 }),
 
                 "InnerClasses" => {
@@ -228,8 +228,8 @@ impl JavaClass {
                 }
 
                 "Exceptions" => AttributeInfoData::Exceptions(ExceptionsAttribute {
-                    exception_index_table: (0..*reader.read::<u16>().unwrap())
-                        .map(|_| *reader.read().unwrap())
+                    exception_index_table: (0..reader.read::<u16>().unwrap())
+                        .map(|_| reader.read().unwrap())
                         .collect(),
                 }),
 
@@ -261,18 +261,18 @@ impl JavaClass {
                     */
                 }
                 "ConstantValue" => AttributeInfoData::ConstantValue(ConstantValueAttribute {
-                    constantvalue_index: *reader.read().unwrap(),
+                    constantvalue_index: reader.read().unwrap(),
                 }),
 
                 "LocalVariableTable" => {
                     AttributeInfoData::LocalVariableTable(LocalVariableTableAttribute {
-                        local_variable_table: (0..*reader.read::<u16>().unwrap())
+                        local_variable_table: (0..reader.read::<u16>().unwrap())
                             .map(|_| LocalVariableTableEntry {
-                                start_pc: *reader.read().unwrap(),
-                                length: *reader.read().unwrap(),
-                                name_index: *reader.read().unwrap(),
-                                signature_descriptor_index: *reader.read().unwrap(),
-                                index: *reader.read().unwrap(),
+                                start_pc: reader.read().unwrap(),
+                                length: reader.read().unwrap(),
+                                name_index: reader.read().unwrap(),
+                                signature_descriptor_index: reader.read().unwrap(),
+                                index: reader.read().unwrap(),
                             })
                             .collect(),
                     })
@@ -280,13 +280,13 @@ impl JavaClass {
 
                 "LocalVariableTypeTable" => {
                     AttributeInfoData::LocalVariableTypeTable(LocalVariableTypeTableAttribute {
-                        local_variable_type_table: (0..*reader.read::<u16>().unwrap())
+                        local_variable_type_table: (0..reader.read::<u16>().unwrap())
                             .map(|_| LocalVariableTableEntry {
-                                start_pc: *reader.read().unwrap(),
-                                length: *reader.read().unwrap(),
-                                name_index: *reader.read().unwrap(),
-                                signature_descriptor_index: *reader.read().unwrap(),
-                                index: *reader.read().unwrap(),
+                                start_pc: reader.read().unwrap(),
+                                length: reader.read().unwrap(),
+                                name_index: reader.read().unwrap(),
+                                signature_descriptor_index: reader.read().unwrap(),
+                                index: reader.read().unwrap(),
                             })
                             .collect(),
                     })
@@ -339,17 +339,17 @@ impl JavaClass {
     }
 
     fn parse_fields(
-        reader: &mut BinaryReader,
+        reader: &mut ByteReader,
         constant_pool: &ConstantPool,
     ) -> Result<Vec<FieldInfo>, Box<dyn Error>> {
-        let field_count: u16 = *reader.read()?;
+        let field_count: u16 = reader.read()?;
 
         let mut fields = vec![];
         for _ in 0..field_count {
             fields.push(FieldInfo {
-                access_flags: *reader.read()?,
-                name_index: *reader.read()?,
-                descriptor_index: *reader.read()?,
+                access_flags: reader.read()?,
+                name_index: reader.read()?,
+                descriptor_index: reader.read()?,
                 attributes: JavaClass::parse_attributes(reader, constant_pool)?,
             })
         }

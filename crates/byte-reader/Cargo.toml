@@ -1,5 +1,5 @@
 [package]
-name = "binary_reader"
+name = "byte-reader"
 version = "0.1.0"
 edition = "2021"
 

@@ -1,4 +1,4 @@
-use binary_reader::BinaryReader;
+use byte_reader::ByteReader;
 use std::io::Result;
 
 #[derive(Debug, Clone)]
@@ -7,8 +7,8 @@ pub struct ConstantPool {
 }
 
 impl ConstantPool {
-    pub fn from_reader(reader: &mut BinaryReader) -> Result<Self> {
-        let pool_count = *reader.read::<u16>()? - 1;
+    pub fn from_reader(reader: &mut ByteReader) -> Result<Self> {
+        let pool_count = reader.read::<u16>()? - 1;
 
         let mut last_was_8byte = false;
         let entries: Vec<CpInfo> = (0..pool_count)
@@ -17,7 +17,7 @@ impl ConstantPool {
                     last_was_8byte = false;
                     return CpInfo::EmptyCpEntry;
                 }
-                let cp_tag = *reader.read::<u8>().unwrap();
+                let cp_tag: u8 = reader.read().unwrap();
 
                 if cp_tag == 5 || cp_tag == 6 { // CONSTANT_Long CONSTANT_Double
                     last_was_8byte = true;
@@ -25,20 +25,20 @@ impl ConstantPool {
 
                 return match cp_tag  {
                     1 => CpInfo::Utf8(CpInfoUtf8 { tag: "CONSTANT_Utf8", data: reader.read_string_lossy_length::<u16>().unwrap() }),
-                    3 => CpInfo::Integer(CpInfoInteger { tag: "CONSTANT_Integer", bytes: *reader.read().unwrap() }),
-                    4 => CpInfo::Float(CpInfoFloat { tag: "CONSTANT_Float", bytes: *reader.read().unwrap() }),
-                    5 => CpInfo::Long(CpInfoLong { tag: "CONSTANT_Long", bytes: *reader.read().unwrap() }),
-                    6 => CpInfo::Double(CpInfoDouble { tag: "CONSTANT_Double", bytes: *reader.read().unwrap() }),
-                    7 => CpInfo::Class(CpInfoClass { tag: "CONSTANT_Class", name_index: *reader.read().unwrap() }),
-                    8 => CpInfo::String(CpInfoString { tag: "CONSTANT_String", string_index: *reader.read().unwrap() }),
-                    9 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_Fieldref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
-                    10 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_Methodref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
-                    11 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_InterfaceMethodref", class_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
-                    12 => CpInfo::NameAndType(CpInfoNameAndType { tag: "CONSTANT_NameAndType", name_index: *reader.read().unwrap(), descriptor_index: *reader.read().unwrap() }),
-                    15 => CpInfo::MethodHandle(CpInfoMethodHandle { tag: "CONSTANT_MethodHandle", reference_kind: *reader.read().unwrap(), reference_index: *reader.read().unwrap() }),
-                    16 => CpInfo::MethodType(CpInfoMethodType { tag: "CONSTANT_MethodType", descriptor_index: *reader.read().unwrap() }),
-                    17 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic { tag: "CONSTANT_Dynamic", bootstrap_method_attr_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
-                    18 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic { tag: "CONSTANT_InvokeDynamic", bootstrap_method_attr_index: *reader.read().unwrap(), name_and_type_index: *reader.read().unwrap() }),
+                    3 => CpInfo::Integer(CpInfoInteger { tag: "CONSTANT_Integer", bytes: reader.read().unwrap() }),
+                    4 => CpInfo::Float(CpInfoFloat { tag: "CONSTANT_Float", bytes: reader.read().unwrap() }),
+                    5 => CpInfo::Long(CpInfoLong { tag: "CONSTANT_Long", bytes: reader.read().unwrap() }),
+                    6 => CpInfo::Double(CpInfoDouble { tag: "CONSTANT_Double", bytes: reader.read().unwrap() }),
+                    7 => CpInfo::Class(CpInfoClass { tag: "CONSTANT_Class", name_index: reader.read().unwrap() }),
+                    8 => CpInfo::String(CpInfoString { tag: "CONSTANT_String", string_index: reader.read().unwrap() }),
+                    9 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_Fieldref", class_index: reader.read().unwrap(), name_and_type_index: reader.read().unwrap() }),
+                    10 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_Methodref", class_index: reader.read().unwrap(), name_and_type_index: reader.read().unwrap() }),
+                    11 => CpInfo::Refs(CpInfoRefs { tag: "CONSTANT_InterfaceMethodref", class_index: reader.read().unwrap(), name_and_type_index: reader.read().unwrap() }),
+                    12 => CpInfo::NameAndType(CpInfoNameAndType { tag: "CONSTANT_NameAndType", name_index: reader.read().unwrap(), descriptor_index: reader.read().unwrap() }),
+                    15 => CpInfo::MethodHandle(CpInfoMethodHandle { tag: "CONSTANT_MethodHandle", reference_kind: reader.read().unwrap(), reference_index: reader.read().unwrap() }),
+                    16 => CpInfo::MethodType(CpInfoMethodType { tag: "CONSTANT_MethodType", descriptor_index: reader.read().unwrap() }),
+                    17 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic { tag: "CONSTANT_Dynamic", bootstrap_method_attr_index: reader.read().unwrap(), name_and_type_index: reader.read().unwrap() }),
+                    18 => CpInfo::InvokeDynamic(CpInfoInvokeDynamic { tag: "CONSTANT_InvokeDynamic", bootstrap_method_attr_index: reader.read().unwrap(), name_and_type_index: reader.read().unwrap() }),
                     19 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Module'"),
                     20 => todo!("Implement CONSTANT_TYPE: 'CONSTANT_Package'"),
 

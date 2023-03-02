@@ -2,7 +2,7 @@
 members = [
 	"crates/jvm-parser",
 	"crates/class-parser",
-	"crates/binary_reader",
+	"crates/byte-reader",
 	"jvm",
 ]
 

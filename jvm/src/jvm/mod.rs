@@ -2,10 +2,10 @@ pub mod opcodes;
 
 use std::collections::HashMap;
 
-use binary_reader::BinaryReader;
+use byte_reader::ByteReader;
 use jvm_parser::{
     classfile::{
-        attributes::{AttributeInfo, AttributeInfoData, CodeAttribute},
+        attributes::{AttributeInfoData, CodeAttribute},
         classfile::{MethodAccessFlags, MethodInfo},
         constant_pool::CpInfo,
         JavaClass,
@@ -15,7 +15,7 @@ use jvm_parser::{
 
 use crate::{
     jvm::opcodes::OpCodes,
-    utils::{match_flag, parse_descriptor, Descriptor, DescriptorTypes, DescriptorValues},
+    utils::{match_flag, parse_descriptor, Descriptor, DescriptorTypes},
 };
 // use jvm_parser::ClassFile;
 
@@ -155,8 +155,8 @@ impl JVM {
         code_data: &CodeAttribute,
         java_class: &JavaClass,
     ) {
-        let mut reader = BinaryReader::from_vec(&code_data.code);
-        reader.set_endian(binary_reader::Endian::Big);
+        let mut reader = ByteReader::from_vec(&code_data.code);
+        reader.set_endian(byte_reader::Endian::Big);
 
         // let mut static_classes: HashMap<String, JavaClass> = HashMap::new();
         // let mut java_objects: Vec<JavaClass> = vec![];
@@ -218,13 +218,13 @@ impl JVM {
 
         debug_bytecode(&reader.peak_rest().unwrap());
         while let Ok(opcode_byte) = reader.read::<u8>() {
-            let opcode_byte = *opcode_byte;
+            let opcode_byte = opcode_byte;
             let opcode = OpCodes::from(opcode_byte);
             println!("[Executing Opcode : {opcode:?}]");
 
             match opcode {
                 OpCodes::ldc => {
-                    let index: u8 = *reader.read().unwrap();
+                    let index: u8 = reader.read().unwrap();
 
                     let stack_value = match java_class.constant_pool.get_at(index as u16).unwrap() {
                         CpInfo::String(str) => {
@@ -249,7 +249,7 @@ impl JVM {
                 }
 
                 OpCodes::invokestatic => {
-                    let index: u16 = *reader.read().unwrap();
+                    let index: u16 = reader.read().unwrap();
 
                     let (_, class, name_type) =
                         java_class.constant_pool.get_refs_ext_at(index).unwrap();

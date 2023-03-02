@@ -9,7 +9,7 @@ edition = "2021"
 anyhow = { workspace = true }
 clap = { version = "4.0.18", features = ["derive"] }
 jvm_parser = { path = "../crates/jvm-parser" }
-binary_reader = { path = "../crates/binary_reader" }
+byte-reader = { path = "../crates/byte-reader" }
 class-parser = { path = "../crates/class-parser" }
 
 [features]

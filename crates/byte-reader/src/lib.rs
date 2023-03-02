@@ -15,7 +15,7 @@ pub enum Endian {
 }
 
 #[derive(Clone)]
-pub struct BinaryReader {
+pub struct ByteReader {
     /// The buffer
     data: Vec<u8>,
     /// The current offset (position) in the buffer
@@ -28,7 +28,7 @@ pub struct BinaryReader {
     push_offset: Option<usize>,
 }
 
-impl BinaryReader {
+impl ByteReader {
     pub fn from_vec(vec: &Vec<u8>) -> Self {
         Self {
             data: vec.to_vec(),
@@ -52,7 +52,7 @@ impl BinaryReader {
     }
 }
 
-impl BinaryReader {
+impl ByteReader {
     pub fn set_endian<'a>(&'a mut self, endian: Endian) -> &'a mut Self {
         self.endian = endian;
         self
@@ -205,13 +205,13 @@ impl BinaryReader {
     pub fn read_string_length<T: FromBinaryReader + Into<usize>>(
         &mut self,
     ) -> std::io::Result<String> {
-        let length = *self.read::<T>().unwrap();
+        let length = self.read::<T>().unwrap();
         self.read_string(length.into())
     }
     pub fn read_string_lossy_length<T: FromBinaryReader + Into<usize>>(
         &mut self,
     ) -> std::io::Result<String> {
-        let length = *self.read::<T>().unwrap();
+        let length = self.read::<T>().unwrap();
         self.read_string_lossy(length.into())
     }
 
@@ -230,45 +230,41 @@ impl BinaryReader {
         Ok(String::from_utf8_lossy(self.read_bytes(length)?.as_slice()).to_string())
     }
 
-    pub fn read<T: FromBinaryReader>(&mut self) -> std::io::Result<Box<T>> {
+    pub fn read<T: FromBinaryReader>(&mut self) -> std::io::Result<T> {
         T::read_from_byte_reader(self)
     }
 
-    pub fn peak<T: FromBinaryReader>(&mut self) -> std::io::Result<Box<T>> {
+    pub fn peak<T: FromBinaryReader>(&mut self) -> std::io::Result<T> {
         T::peak_from_byte_reader(self)
     }
 }
 
 pub trait FromBinaryReader {
-    fn read_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<Self>>;
-    fn peak_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<Self>>;
+    fn read_from_byte_reader(reader: &mut ByteReader) -> std::io::Result<Self>
+    where
+        Self: Sized;
+    fn peak_from_byte_reader(reader: &mut ByteReader) -> std::io::Result<Self>
+    where
+        Self: Sized;
 }
 
 macro_rules! impl_from_binary_reader {
     ($ty:ident, $bytes:expr) => {
         impl FromBinaryReader for $ty {
-            fn read_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<$ty>> {
+            fn read_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<$ty> {
                 let endian = reader.endian.clone();
                 let data = reader.read_bytes($bytes)?;
                 match endian {
-                    Endian::Little => Ok(Box::new($ty::from_le_bytes(
-                        data[..$bytes].try_into().unwrap(),
-                    ))),
-                    Endian::Big => Ok(Box::new($ty::from_be_bytes(
-                        data[..$bytes].try_into().unwrap(),
-                    ))),
+                    Endian::Little => Ok($ty::from_le_bytes(data[..$bytes].try_into().unwrap())),
+                    Endian::Big => Ok($ty::from_be_bytes(data[..$bytes].try_into().unwrap())),
                 }
             }
-            fn peak_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<Box<$ty>> {
+            fn peak_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<$ty> {
                 let endian = reader.endian.clone();
                 let data = reader.peak_bytes($bytes)?;
                 match endian {
-                    Endian::Little => Ok(Box::new($ty::from_le_bytes(
-                        data[..$bytes].try_into().unwrap(),
-                    ))),
-                    Endian::Big => Ok(Box::new($ty::from_be_bytes(
-                        data[..$bytes].try_into().unwrap(),
-                    ))),
+                    Endian::Little => Ok($ty::from_le_bytes(data[..$bytes].try_into().unwrap())),
+                    Endian::Big => Ok($ty::from_be_bytes(data[..$bytes].try_into().unwrap())),
                 }
             }
         }
