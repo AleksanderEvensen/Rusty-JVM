@@ -251,7 +251,7 @@ pub trait FromBinaryReader {
 macro_rules! impl_from_binary_reader {
     ($ty:ident, $bytes:expr) => {
         impl FromBinaryReader for $ty {
-            fn read_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<$ty> {
+            fn read_from_byte_reader(reader: &mut crate::ByteReader) -> std::io::Result<$ty> {
                 let endian = reader.endian.clone();
                 let data = reader.read_bytes($bytes)?;
                 match endian {
@@ -259,7 +259,7 @@ macro_rules! impl_from_binary_reader {
                     Endian::Big => Ok($ty::from_be_bytes(data[..$bytes].try_into().unwrap())),
                 }
             }
-            fn peak_from_byte_reader(reader: &mut BinaryReader) -> std::io::Result<$ty> {
+            fn peak_from_byte_reader(reader: &mut crate::ByteReader) -> std::io::Result<$ty> {
                 let endian = reader.endian.clone();
                 let data = reader.peak_bytes($bytes)?;
                 match endian {

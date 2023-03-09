@@ -3,6 +3,9 @@ use std::process::{Command, Stdio};
 fn main() {
     println!("cargo:rerun-if-changed=java/com/");
 
+    println!("Clearing build dir");
+    std::fs::remove_dir_all("../java/out").unwrap();
+
     let java_child = Command::new("javac")
         .args([
             "-sourcepath",

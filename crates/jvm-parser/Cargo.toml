@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-byte-reader = { path="../byte-reader" }
+byte_reader = { path="../byte-reader" }
 flate2 = { version = "1.0.25", features = ["zlib"] }
 rayon = { workspace = true }
