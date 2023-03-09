@@ -2,7 +2,6 @@ pub mod opcodes;
 
 use std::collections::HashMap;
 
-use byte_reader::ByteReader;
 use jvm_parser::{
     classfile::{
         attributes::{AttributeInfoData, CodeAttribute},
@@ -17,6 +16,8 @@ use crate::{
     jvm::opcodes::OpCodes,
     utils::{match_flag, parse_descriptor, Descriptor, DescriptorTypes},
 };
+
+use self::opcodes::parse_opcodes;
 // use jvm_parser::ClassFile;
 
 #[allow(dead_code)]
@@ -108,6 +109,10 @@ impl JVM {
         Ok(())
     }
 
+    pub fn get_classes(&self) -> &HashMap<String, JavaClass> {
+        return &self.classes;
+    }
+
     pub fn run(&self) -> Result<(), String> {
         let Some(main_method_class_name) = &self.main_method_class else {
 			return Err("There is no main function to run".to_string());
@@ -155,12 +160,45 @@ impl JVM {
         code_data: &CodeAttribute,
         java_class: &JavaClass,
     ) {
-        let mut reader = ByteReader::from_vec(&code_data.code);
-        reader.set_endian(byte_reader::Endian::Big);
+        let opcodes = parse_opcodes(&code_data.code).unwrap();
+
+        for opcode in opcodes {
+            #[allow(unused_variables)]
+            match opcode {
+                OpCodes::dup => todo!(),
+                OpCodes::getstatic(cp_index) => todo!(),
+                OpCodes::ldc(cp_index) => todo!(),
+                OpCodes::ldc2_w(cp_index) => todo!(),
+                OpCodes::ldc_w(cp_index) => todo!(),
+                OpCodes::invokevirtual(cp_index) => todo!(),
+                OpCodes::invokespecial(cp_index) => todo!(),
+                OpCodes::invokestatic(cp_index) => todo!(),
+                OpCodes::bipush(byte) => todo!(),
+                OpCodes::sipush(short) => todo!(),
+                OpCodes::new(cp_index) => todo!(),
+                OpCodes::anewarray(cp_index) => todo!(),
+                OpCodes::istore_(local_index) => todo!(),
+                OpCodes::iconst_(local_index) => todo!(),
+                OpCodes::iload_(local_index) => todo!(),
+                OpCodes::fstore_(local_index) => todo!(),
+                OpCodes::fconst_(local_index) => todo!(),
+                OpCodes::fload_(local_index) => todo!(),
+                OpCodes::astore_(local_index) => todo!(),
+                OpCodes::aconst_null => todo!(),
+                OpCodes::aload_(local_index) => todo!(),
+
+                OpCodes::nop | OpCodes::Return => {}
+
+                _ => {}
+            }
+        }
+
+        // let mut reader = ByteReader::from_vec(&code_data.code);
+        // reader.set_endian(byte_reader::Endian::Big);
 
         // let mut static_classes: HashMap<String, JavaClass> = HashMap::new();
         // let mut java_objects: Vec<JavaClass> = vec![];
-        let mut operand_stack: Vec<StackValue> = vec![];
+        // let mut operand_stack: Vec<StackValue> = vec![];
         // let mut frame = vec![StackValue::default(); code_data.max_locals as usize];
 
         // #[allow(unused)]
@@ -177,144 +215,144 @@ impl JVM {
         //     println!("Java Static Classes: {:#?}", static_classes.keys());
         // }
 
-        #[allow(unused)]
-        fn debug_bytecode(bytecode: &Vec<u8>) {
-            println!("===========================\nCurrent Remaining bytecode:");
-            println!("Byte Code Bytes: {:?}", &bytecode);
-            println!("With potential opcodes:");
+        // #[allow(unused)]
+        // fn debug_bytecode(bytecode: &Vec<u8>) {
+        //     println!("===========================\nCurrent Remaining bytecode:");
+        //     println!("Byte Code Bytes: {:?}", &bytecode);
+        //     println!("With potential opcodes:");
 
-            let mut iter = bytecode.iter();
+        //     let mut iter = bytecode.iter();
 
-            while let Some(v) = iter.next() {
-                let opcode = OpCodes::from(*v);
-                match opcode {
-                    OpCodes::getstatic => {
-                        let index =
-                            u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
-                        println!("  {:?}({})", opcode, index);
-                    }
-                    OpCodes::ldc => {
-                        let index = u8::from_be_bytes([*iter.next().unwrap()]);
-                        println!("  {:?}({})", opcode, index);
-                    }
+        //     while let Some(v) = iter.next() {
+        //         let opcode = OpCodes::from(*v);
+        //         match opcode {
+        //             OpCodes::getstatic => {
+        //                 let index =
+        //                     u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
+        //                 println!("  {:?}({})", opcode, index);
+        //             }
+        //             OpCodes::ldc => {
+        //                 let index = u8::from_be_bytes([*iter.next().unwrap()]);
+        //                 println!("  {:?}({})", opcode, index);
+        //             }
 
-                    OpCodes::invokevirtual => {
-                        let index =
-                            u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
-                        println!("  {:?}({})", opcode, index);
-                    }
+        //             OpCodes::invokevirtual => {
+        //                 let index =
+        //                     u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
+        //                 println!("  {:?}({})", opcode, index);
+        //             }
 
-                    OpCodes::invokestatic => {
-                        let index =
-                            u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
-                        println!("  {:?}({})", opcode, index);
-                    }
+        //             OpCodes::invokestatic => {
+        //                 let index =
+        //                     u16::from_be_bytes([*iter.next().unwrap(), *iter.next().unwrap()]);
+        //                 println!("  {:?}({})", opcode, index);
+        //             }
 
-                    v => println!("  {:?}", v),
-                }
-            }
-            println!();
-        }
+        //             v => println!("  {:?}", v),
+        //         }
+        //     }
+        //     println!();
+        // }
 
-        debug_bytecode(&reader.peak_rest().unwrap());
-        while let Ok(opcode_byte) = reader.read::<u8>() {
-            let opcode_byte = opcode_byte;
-            let opcode = OpCodes::from(opcode_byte);
-            println!("[Executing Opcode : {opcode:?}]");
+        // debug_bytecode(&reader.peak_rest().unwrap());
+        // while let Ok(opcode_byte) = reader.read::<u8>() {
+        //     let opcode_byte = opcode_byte;
+        //     let opcode = OpCodes::from(opcode_byte);
+        //     println!("[Executing Opcode : {opcode:?}]");
 
-            match opcode {
-                OpCodes::ldc => {
-                    let index: u8 = reader.read().unwrap();
+        //     match opcode {
+        //         OpCodes::ldc => {
+        //             let index: u8 = reader.read().unwrap();
 
-                    let stack_value = match java_class.constant_pool.get_at(index as u16).unwrap() {
-                        CpInfo::String(str) => {
-                            let text = java_class
-                                .constant_pool
-                                .get_utf8_at(str.string_index)
-                                .unwrap()
-                                .data
-                                .clone();
+        //             let stack_value = match java_class.constant_pool.get_at(index as u16).unwrap() {
+        //                 CpInfo::String(str) => {
+        //                     let text = java_class
+        //                         .constant_pool
+        //                         .get_utf8_at(str.string_index)
+        //                         .unwrap()
+        //                         .data
+        //                         .clone();
 
-                            StackValue::String(text)
-                        }
+        //                     StackValue::String(text)
+        //                 }
 
-                        CpInfo::Integer(int) => StackValue::Integer(int.bytes),
-                        CpInfo::Float(float) => StackValue::Float(float.bytes),
+        //                 CpInfo::Integer(int) => StackValue::Integer(int.bytes),
+        //                 CpInfo::Float(float) => StackValue::Float(float.bytes),
 
-                        unimplemented_type => {
-                            panic!("[OpCode : LDC] The value at index ( {} ) in the constant_pool, does not have an implementation on the operand stack. Constant pool value: {:#?}", index, unimplemented_type);
-                        }
-                    };
-                    operand_stack.push(stack_value);
-                }
+        //                 unimplemented_type => {
+        //                     panic!("[OpCode : LDC] The value at index ( {} ) in the constant_pool, does not have an implementation on the operand stack. Constant pool value: {:#?}", index, unimplemented_type);
+        //                 }
+        //             };
+        //             operand_stack.push(stack_value);
+        //         }
 
-                OpCodes::invokestatic => {
-                    let index: u16 = reader.read().unwrap();
+        //         OpCodes::invokestatic => {
+        //             let index: u16 = reader.read().unwrap();
 
-                    let (_, class, name_type) =
-                        java_class.constant_pool.get_refs_ext_at(index).unwrap();
-                    let class_name = java_class
-                        .constant_pool
-                        .get_utf8_at(class.name_index)
-                        .unwrap()
-                        .data
-                        .clone();
+        //             let (_, class, name_type) =
+        //                 java_class.constant_pool.get_refs_ext_at(index).unwrap();
+        //             let class_name = java_class
+        //                 .constant_pool
+        //                 .get_utf8_at(class.name_index)
+        //                 .unwrap()
+        //                 .data
+        //                 .clone();
 
-                    let function_name = java_class
-                        .constant_pool
-                        .get_utf8_at(name_type.name_index)
-                        .unwrap()
-                        .data
-                        .clone();
-                    let descriptor = java_class
-                        .constant_pool
-                        .get_utf8_at(name_type.descriptor_index)
-                        .unwrap()
-                        .data
-                        .clone();
+        //             let function_name = java_class
+        //                 .constant_pool
+        //                 .get_utf8_at(name_type.name_index)
+        //                 .unwrap()
+        //                 .data
+        //                 .clone();
+        //             let descriptor = java_class
+        //                 .constant_pool
+        //                 .get_utf8_at(name_type.descriptor_index)
+        //                 .unwrap()
+        //                 .data
+        //                 .clone();
 
-                    let descriptor = parse_descriptor(&descriptor);
+        //             let descriptor = parse_descriptor(&descriptor);
 
-                    let target_class = self.classes.get(&class_name).unwrap();
+        //             let target_class = self.classes.get(&class_name).unwrap();
 
-                    let method = target_class.get_method_by_name(&function_name).unwrap();
+        //             let method = target_class.get_method_by_name(&function_name).unwrap();
 
-                    // match method.access_flags {}
+        //             // match method.access_flags {}
 
-                    if match_flag(
-                        method.access_flags,
-                        MethodAccessFlags::ACC_NATIVE | MethodAccessFlags::ACC_SYNCHRONIZED,
-                    ) {
-                        todo!("Implement the seperate logic when executing native and synchronized: https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-6.html#jvms-6.5.invokestatic")
-                    } else if method.access_flags & MethodAccessFlags::ACC_NATIVE as u16 != 0 {
-                        // println!("[Invokenative]");
+        //             if match_flag(
+        //                 method.access_flags,
+        //                 MethodAccessFlags::ACC_NATIVE | MethodAccessFlags::ACC_SYNCHRONIZED,
+        //             ) {
+        //                 todo!("Implement the seperate logic when executing native and synchronized: https://docs.oracle.com/javase/specs/jvms/se19/html/jvms-6.html#jvms-6.5.invokestatic")
+        //             } else if method.access_flags & MethodAccessFlags::ACC_NATIVE as u16 != 0 {
+        //                 // println!("[Invokenative]");
 
-                        self.native_methods
-                            .get(format!("{class_name};{function_name}").as_str())
-                            .unwrap()(
-                            vec![StackValue::String("Hello World, Hardcoded".to_string())],
-                            descriptor,
-                        );
-                    } else {
-                        todo!("Implement logic for invoking static functions for a specified class")
-                    }
+        //                 self.native_methods
+        //                     .get(format!("{class_name};{function_name}").as_str())
+        //                     .unwrap()(
+        //                     vec![StackValue::String("Hello World, Hardcoded".to_string())],
+        //                     descriptor,
+        //                 );
+        //             } else {
+        //                 todo!("Implement logic for invoking static functions for a specified class")
+        //             }
 
-                    // println!(
-                    //     "[OpCodes : invokestatic] Invoking {:#?}",
-                    //     (&class_name, &function_name, &descriptor)
-                    // );
-                }
+        //             // println!(
+        //             //     "[OpCodes : invokestatic] Invoking {:#?}",
+        //             //     (&class_name, &function_name, &descriptor)
+        //             // );
+        //         }
 
-                OpCodes::Return => { /* for now, just don't do shit */ }
-                OpCodes::nop => { /* this is meant to be empty */ }
-                unknown_opcode => {
-                    panic!(
-                        "The OpCode ( {} : {:?} ) is not imeplemented",
-                        opcode_byte, unknown_opcode
-                    )
-                }
-            }
-        }
+        //         OpCodes::Return => { /* for now, just don't do shit */ }
+        //         OpCodes::nop => { /* this is meant to be empty */ }
+        //         unknown_opcode => {
+        //             panic!(
+        //                 "The OpCode ( {} : {:?} ) is not imeplemented",
+        //                 opcode_byte, unknown_opcode
+        //             )
+        //         }
+        //     }
+        // }
 
         // while bytes.len() > 0 {
         //     match opcode {
