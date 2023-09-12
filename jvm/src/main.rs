@@ -3,20 +3,8 @@ mod utils;
 
 use clap::Parser;
 use jvm::JVM;
-use jvm_parser::{
-    classfile::{
-        attributes::{AttributeInfo, AttributeInfoData},
-        JavaClass,
-    },
-    jar::JarFile,
-};
-use std::{
-    fs::File,
-    io::{BufReader, Read},
-    path::PathBuf,
-};
-
-use crate::jvm::opcodes::parse_opcodes;
+use jvm_parser::{classfile::JavaClass, jar::JarFile};
+use std::path::PathBuf;
 
 #[macro_export]
 #[cfg(not(feature = "debug"))]
@@ -46,11 +34,14 @@ fn main() {
             // Some(PathBuf::from(
             //     "C:/Users/ahse0/AppData/Roaming/.minecraft/versions/1.19.3./1.19.3.jar",
             // ))
-            Some(PathBuf::from("./rt.jar"))
+            Some(PathBuf::from("./java/jvm-test.jar"))
         })
         .unwrap();
 
     let mut jvm = JVM::new();
+
+    jvm.add_jar(JarFile::from_file(&PathBuf::from("./rt.jar")).unwrap())
+        .unwrap();
 
     let file_ext = file.extension().unwrap();
 
@@ -60,23 +51,5 @@ fn main() {
         jvm.add_jar(JarFile::from_file(&file).unwrap()).unwrap();
     }
 
-    jvm.get_classes()
-        .iter()
-        .for_each(|(class_name, java_class)| {
-            println!("Verifying: {class_name}");
-            java_class.methods.iter().for_each(|method| {
-                if let Some(code_attrib) = method.attributes.iter().find(|v| match v.attribute {
-                    AttributeInfoData::Code(_) => true,
-                    _ => false,
-                }) {
-                    let AttributeInfoData::Code(code) = &code_attrib.attribute else {
-						unreachable!("This should never be reachable");
-					};
-
-                    parse_opcodes(&code.code).unwrap();
-                }
-            })
-        });
-
-    // jvm.run().unwrap();
+    jvm.run().unwrap();
 }

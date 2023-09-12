@@ -19,7 +19,11 @@ pub enum OpCodes {
     dup,
     dup2,
     dup_x1,
+    dup_x2,
+    dup2_x1,
+    dup2_x2,
     pop,
+    pop2,
     getstatic(u16),
     ldc(u8),
     ldc2_w(u16),
@@ -36,6 +40,7 @@ pub enum OpCodes {
     anewarray(u16),
     newarray(u8),
     arraylength,
+    multianewarray(u16, u8),
 
     // Integer Operand codes
     istore_(u8),
@@ -46,9 +51,19 @@ pub enum OpCodes {
     iaload,
     baload,
     aaload,
+    laload,
+    saload,
     iastore,
     aastore,
     castore,
+    fastore,
+    dastore,
+    sastore,
+    faload,
+    bastore,
+    caload,
+    lastore,
+    daload,
 
     fstore_(u8),
     fconst_(f32),
@@ -69,6 +84,22 @@ pub enum OpCodes {
     checkcast(u16),
     i2f,
     i2l,
+    i2b,
+    i2d,
+    i2c,
+    i2s,
+
+    l2i,
+    l2d,
+    l2f,
+
+    f2d,
+    f2i,
+    f2l,
+
+    d2f,
+    d2i,
+    d2l,
 
     putfield(u16),
     getfield(u16),
@@ -87,9 +118,42 @@ pub enum OpCodes {
     iadd,
     imul,
     ixor,
+    ior,
     iushr,
+    ishl,
+    ishr,
     idiv,
     iinc(u8, i8),
+    irem,
+    ineg,
+
+    lsub,
+    ladd,
+    land,
+    lmul,
+    ldiv,
+    lrem,
+    lshl,
+    lshr,
+    lushr,
+    lneg,
+    lor,
+    lxor,
+
+    fsub,
+    fadd,
+    fmul,
+    fdiv,
+    fneg,
+    fcmp(i8),
+
+    dsub,
+    dadd,
+    dmul,
+    ddiv,
+    dneg,
+    drem,
+    dcmp(i8),
 
     goto(u16),
 
@@ -98,25 +162,46 @@ pub enum OpCodes {
 
     instanceof(u16),
 
+    tableswitch(i32, i32, i32),
+    lookupswitch(u32, u32),
+
+    wide {
+        opcode: Box<OpCodes>,
+        index: u16,
+        constbyte: Option<i16>,
+    },
+
+    jsr(i16),
+    ret(u8),
+
     athrow,
 
     lreturn,
     ireturn,
     areturn,
+    dreturn,
+    freturn,
     Return,
 }
 
 pub fn parse_opcodes(opcode_bytes: &Vec<u8>) -> std::io::Result<Vec<OpCodes>> {
     let mut reader = ByteReader::from_vec(opcode_bytes);
+    reader.set_endian(byte_reader::Endian::Big);
     let mut opcodes = vec![];
 
     while let Ok(opcode_byte) = reader.read::<u8>() {
+        let pc = reader.get_current_offset() - 1;
+
         let opcode = match opcode_byte {
             0x00 => OpCodes::nop,
             0x59 => OpCodes::dup,
             0x5c => OpCodes::dup2,
             0x5a => OpCodes::dup_x1,
+            0x5b => OpCodes::dup_x2,
+            0x5d => OpCodes::dup2_x1,
+            0x5e => OpCodes::dup2_x2,
             0x57 => OpCodes::pop,
+            0x58 => OpCodes::pop2,
             0xb2 => OpCodes::getstatic(reader.read()?),
             0x12 => OpCodes::ldc(reader.read()?),
             0x13 => OpCodes::ldc_w(reader.read()?),
@@ -151,6 +236,7 @@ pub fn parse_opcodes(opcode_bytes: &Vec<u8>) -> std::io::Result<Vec<OpCodes>> {
             0xbd => OpCodes::anewarray(reader.read()?),
             0xbc => OpCodes::newarray(reader.read()?),
             0xbe => OpCodes::arraylength,
+            0xc5 => OpCodes::multianewarray(reader.read()?, reader.read()?),
 
             0x36 => OpCodes::istore_(reader.read()?),
             0x3b => OpCodes::istore_(0),
@@ -175,9 +261,19 @@ pub fn parse_opcodes(opcode_bytes: &Vec<u8>) -> std::io::Result<Vec<OpCodes>> {
             0x2e => OpCodes::iaload,
             0x33 => OpCodes::baload,
             0x32 => OpCodes::aaload,
+            0x2f => OpCodes::laload,
+            0x35 => OpCodes::saload,
             0x4f => OpCodes::iastore,
             0x53 => OpCodes::aastore,
             0x55 => OpCodes::castore,
+            0x51 => OpCodes::fastore,
+            0x52 => OpCodes::dastore,
+            0x56 => OpCodes::sastore,
+            0x30 => OpCodes::faload,
+            0x54 => OpCodes::bastore,
+            0x34 => OpCodes::caload,
+            0x50 => OpCodes::lastore,
+            0x31 => OpCodes::daload,
 
             0x38 => OpCodes::fstore_(reader.read()?),
             0x43 => OpCodes::fstore_(0),
@@ -242,6 +338,22 @@ pub fn parse_opcodes(opcode_bytes: &Vec<u8>) -> std::io::Result<Vec<OpCodes>> {
             0xc0 => OpCodes::checkcast(reader.read()?),
             0x86 => OpCodes::i2f,
             0x85 => OpCodes::i2l,
+            0x91 => OpCodes::i2b,
+            0x87 => OpCodes::i2d,
+            0x92 => OpCodes::i2c,
+            0x93 => OpCodes::i2s,
+
+            0x88 => OpCodes::l2i,
+            0x8a => OpCodes::l2d,
+            0x89 => OpCodes::l2f,
+
+            0x8d => OpCodes::f2d,
+            0x8B => OpCodes::f2i,
+            0x8C => OpCodes::f2l,
+
+            0x90 => OpCodes::d2f,
+            0x8e => OpCodes::d2i,
+            0x8f => OpCodes::d2l,
 
             0xb5 => OpCodes::putfield(reader.read()?),
             0xb4 => OpCodes::getfield(reader.read()?),
@@ -275,9 +387,44 @@ pub fn parse_opcodes(opcode_bytes: &Vec<u8>) -> std::io::Result<Vec<OpCodes>> {
             0x60 => OpCodes::iadd,
             0x68 => OpCodes::imul,
             0x82 => OpCodes::ixor,
+            0x80 => OpCodes::ior,
             0x7c => OpCodes::iushr,
+            0x78 => OpCodes::ishl,
+            0x7a => OpCodes::ishr,
             0x6c => OpCodes::idiv,
             0x84 => OpCodes::iinc(reader.read()?, reader.read()?),
+            0x70 => OpCodes::irem,
+            0x74 => OpCodes::ineg,
+
+            0x65 => OpCodes::lsub,
+            0x61 => OpCodes::ladd,
+            0x7f => OpCodes::land,
+            0x69 => OpCodes::lmul,
+            0x6d => OpCodes::ldiv,
+            0x71 => OpCodes::lrem,
+            0x79 => OpCodes::lshl,
+            0x7b => OpCodes::lshr,
+            0x7d => OpCodes::lushr,
+            0x75 => OpCodes::lneg,
+            0x81 => OpCodes::lor,
+            0x83 => OpCodes::lxor,
+
+            0x66 => OpCodes::fsub,
+            0x62 => OpCodes::fadd,
+            0x6a => OpCodes::fmul,
+            0x6e => OpCodes::fdiv,
+            0x76 => OpCodes::fneg,
+            0x96 => OpCodes::fcmp(1),
+            0x95 => OpCodes::fcmp(-1),
+
+            0x67 => OpCodes::dsub,
+            0x63 => OpCodes::dadd,
+            0x6B => OpCodes::dmul,
+            0x6f => OpCodes::ddiv,
+            0x77 => OpCodes::dneg,
+            0x73 => OpCodes::drem,
+            0x98 => OpCodes::dcmp(1),
+            0x97 => OpCodes::dcmp(-1),
 
             0xa7 => OpCodes::goto(reader.read()?),
 
@@ -291,16 +438,124 @@ pub fn parse_opcodes(opcode_bytes: &Vec<u8>) -> std::io::Result<Vec<OpCodes>> {
             0xad => OpCodes::lreturn,
             0xac => OpCodes::ireturn,
             0xb0 => OpCodes::areturn,
+            0xaf => OpCodes::dreturn,
+            0xae => OpCodes::freturn,
             0xb1 => OpCodes::Return,
+
+            0xaa => {
+                let jump_by = 4 - pc % 4 - 1;
+                reader.jump(jump_by);
+
+                let default_byte: i32 = reader.read()?;
+                let low: i32 = reader.read()?;
+                let high: i32 = reader.read()?;
+
+                let jump = (4 * (high - low + 1)) as usize;
+                reader.jump(jump);
+
+                OpCodes::tableswitch(default_byte, low, high)
+            }
+
+            0xab => {
+                let jump_by = 4 - pc % 4 - 1;
+                reader.jump(jump_by);
+
+                let default_byte = reader.read()?;
+                let count = reader.read()?;
+
+                reader.jump((8 * count) as usize);
+
+                OpCodes::lookupswitch(default_byte, count)
+            }
+
+            0xC4 => {
+                let widened_opcode: u8 = reader.read()?;
+
+                match widened_opcode {
+                    0x15 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::iload_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x17 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::fload_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x19 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::aload_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x16 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::lload_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x18 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::dload_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x36 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::istore_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x38 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::fstore_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x3a => OpCodes::wide {
+                        opcode: Box::new(OpCodes::astore_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x37 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::istore_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x39 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::dstore_(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0xa9 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::ret(0)),
+                        index: reader.read()?,
+                        constbyte: None,
+                    },
+                    0x84 => OpCodes::wide {
+                        opcode: Box::new(OpCodes::iinc(0, 0)),
+                        index: reader.read()?,
+                        constbyte: Some(reader.read()?),
+                    },
+
+                    invalid_opcode => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::Unsupported,
+                            format!(
+                                "Invalid widened opcode: {invalid_opcode} | {invalid_opcode:X}"
+                            ),
+                        ))
+                    }
+                }
+            }
+
+            0xa8 => OpCodes::jsr(reader.read()?),
+            0xa9 => OpCodes::ret(reader.read()?),
 
             unknown_opcode => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Unsupported,
-                    format!("Unknown opcode: {unknown_opcode}"),
+                    format!("Unknown opcode: {unknown_opcode} | {unknown_opcode:X}"),
                 ));
             }
         };
 
+        // println!("      #{pc} | OpCode: {:?}", opcode);
         opcodes.push(opcode);
     }
 

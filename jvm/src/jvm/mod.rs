@@ -14,7 +14,7 @@ use jvm_parser::{
 
 use crate::{
     jvm::opcodes::OpCodes,
-    utils::{match_flag, parse_descriptor, Descriptor, DescriptorTypes},
+    utils::{parse_descriptor, Descriptor, DescriptorTypes},
 };
 
 use self::opcodes::parse_opcodes;
@@ -57,9 +57,16 @@ impl JVM {
             Box::new(|args, descriptor| match descriptor {
                 Descriptor {
                     return_value: DescriptorTypes::Void,
-                    parameters: _,
-                } => {
-                    println!("{:?}", args.get(0).unwrap());
+                    parameters: params,
+                } if params.get(0)
+                    == Some(&DescriptorTypes::Class("java/lang/String".to_string())) =>
+                {
+                    let StackValue::String(v) = &args[0] else {
+                        panic!(
+                            "A string wans't passed as an argument to the print(String) function"
+                        );
+                    };
+                    println!("{v}");
                     StackValue::None
                 }
 
@@ -78,12 +85,20 @@ impl JVM {
 
     pub fn add_class(&mut self, java_class: JavaClass) -> Result<(), String> {
         let Some(cp_class) = java_class.constant_pool.get_class_at(java_class.this_class) else {
-			return Err(format!("No class constant pool entry at location {}, found: {:?}", java_class.this_class, java_class.constant_pool.get_at(java_class.this_class)));
-		};
+            return Err(format!(
+                "No class constant pool entry at location {}, found: {:?}",
+                java_class.this_class,
+                java_class.constant_pool.get_at(java_class.this_class)
+            ));
+        };
 
         let Some(class_name) = java_class.constant_pool.get_utf8_at(cp_class.name_index) else {
-			return Err(format!("No Utf8 constant pool entry at location {}, found: {:?}", cp_class.name_index, java_class.constant_pool.get_at(cp_class.name_index)));
-		};
+            return Err(format!(
+                "No Utf8 constant pool entry at location {}, found: {:?}",
+                cp_class.name_index,
+                java_class.constant_pool.get_at(cp_class.name_index)
+            ));
+        };
 
         if java_class.access_flags & 0x0001 != 0 {
             if let Some(method) = java_class.get_method_by_name(&"main".to_string()) {
@@ -113,17 +128,33 @@ impl JVM {
         return &self.classes;
     }
 
+    fn get_method_from_class(
+        &self,
+        class_name: &str,
+        method_name: &str,
+    ) -> Option<(&JavaClass, &MethodInfo)> {
+        let Some(class) = &self.classes.get(class_name) else {
+            return None;
+        };
+
+        let Some(method) = class.get_method_by_name(&method_name.to_string()) else {
+            return None;
+        };
+
+        Some((class, method))
+    }
+
     pub fn run(&self) -> Result<(), String> {
         let Some(main_method_class_name) = &self.main_method_class else {
-			return Err("There is no main function to run".to_string());
-		};
+            return Err("There is no main function to run".to_string());
+        };
 
-        let Some(main_class) = &self.classes.get(main_method_class_name) else {
-			return Err(format!("There is no class with the class name: {main_method_class_name}"));
-		};
-        let Some(method) = main_class.get_method_by_name(&"main".to_string()) else {
-			return Err(format!("Could not find the main method in the class: {main_method_class_name}"));
-		};
+        let Some((main_class, method)) = self.get_method_from_class(main_method_class_name, "main")
+        else {
+            return Err(format!(
+                "Could not find main method in class: {main_method_class_name}"
+            ));
+        };
 
         if method.access_flags != /* public static */ (0x0001 | 0x0008) {
             return Err(format!(
@@ -131,21 +162,20 @@ impl JVM {
             ));
         }
 
-        let Some(method_byte_code) =
-            method
-                .attributes
-                .iter()
-                .find(|attribute| match attribute.attribute {
-                    AttributeInfoData::Code(_) => true,
-                    _ => false,
-                }).map(|attribute| {
-					match &attribute.attribute {
-						AttributeInfoData::Code(byte_code_data) => byte_code_data,
-						_ => unreachable!()
-					}
-				}) else {
-					return Err(format!("The main method in the class '{main_method_class_name}' does not have runnable byte code"))
-				};
+        let Some(method_byte_code) = method
+            .attributes
+            .iter()
+            .find(|attribute| match attribute.attribute {
+                AttributeInfoData::Code(_) => true,
+                _ => false,
+            })
+            .map(|attribute| match &attribute.attribute {
+                AttributeInfoData::Code(byte_code_data) => byte_code_data,
+                _ => unreachable!(),
+            })
+        else {
+            return Err(format!("The main method in the class '{main_method_class_name}' does not have runnable byte code"));
+        };
 
         // dbg!(method_byte_code);
 
@@ -161,18 +191,103 @@ impl JVM {
         java_class: &JavaClass,
     ) {
         let opcodes = parse_opcodes(&code_data.code).unwrap();
+        let mut stack: Vec<StackValue> = vec![];
 
         for opcode in opcodes {
             #[allow(unused_variables)]
             match opcode {
                 OpCodes::dup => todo!(),
                 OpCodes::getstatic(cp_index) => todo!(),
-                OpCodes::ldc(cp_index) => todo!(),
+                OpCodes::ldc(cp_index) => {
+                    let Some(entry) = java_class.constant_pool.get_at(cp_index as u16) else {
+                        panic!("No entry at index: {cp_index} in constant_pool");
+                    };
+
+                    match entry {
+                        CpInfo::Integer(cp_int) => todo!("ldc integer"),
+                        CpInfo::Float(cp_f) => todo!("ldc float"),
+                        CpInfo::Class(cp_class) => todo!("ldc class"),
+                        CpInfo::String(cp_str) => stack.push(StackValue::String(
+                            java_class
+                                .constant_pool
+                                .get_utf8_at(cp_str.string_index)
+                                .unwrap()
+                                .data
+                                .clone(),
+                        )),
+                        CpInfo::MethodHandle(cp_method) => todo!("ldc method handle"),
+                        CpInfo::MethodType(cp_method_type) => todo!("ldc method type"),
+                        // TODO: CpInfo::Dynamic -- find out which this one is
+                        _ => panic!("Tried to load an unloadable constant value"),
+                    }
+                }
                 OpCodes::ldc2_w(cp_index) => todo!(),
                 OpCodes::ldc_w(cp_index) => todo!(),
                 OpCodes::invokevirtual(cp_index) => todo!(),
                 OpCodes::invokespecial(cp_index) => todo!(),
-                OpCodes::invokestatic(cp_index) => todo!(),
+                OpCodes::invokestatic(cp_index) => {
+                    let Some((_, cp_class, cp_name_n_type)) =
+                        java_class.constant_pool.get_refs_ext_at(cp_index as u16)
+                    else {
+                        panic!("Didn't find shit");
+                    };
+
+                    let Some(class_name) =
+                        java_class.constant_pool.get_utf8_at(cp_class.name_index)
+                    else {
+                        panic!(
+                            "Couldn't find class name in constant pool at index: {}",
+                            cp_class.name_index
+                        );
+                    };
+
+                    let Some(method_name) = java_class
+                        .constant_pool
+                        .get_utf8_at(cp_name_n_type.name_index)
+                    else {
+                        panic!(
+                            "Couldn't find method name in constant pool at index: {}",
+                            cp_name_n_type.name_index
+                        );
+                    };
+
+                    let Some((j_class, method)) =
+                        self.get_method_from_class(&class_name.data, &method_name.data)
+                    else {
+                        panic!(
+                            "Couldn't find class '{}' with method '{}' in class hash list",
+                            class_name.data, method_name.data
+                        );
+                    };
+
+                    if method.access_flags & MethodAccessFlags::ACC_NATIVE != 0 {
+                        let Some(native_method) = self
+                            .native_methods
+                            .get(format!("{};{}", class_name.data, method_name.data).as_str())
+                        else {
+                            panic!(
+                                "Native method isn't in library: {};{}",
+                                class_name.data, method_name.data
+                            );
+                        };
+
+                        let Some(descriptor) =
+                            j_class.constant_pool.get_utf8_at(method.descriptor_index)
+                        else {
+                            panic!("Failed to find descriptor");
+                        };
+
+                        let descriptor = parse_descriptor(&descriptor.data);
+
+                        let params = stack
+                            .drain(stack.len().saturating_sub(descriptor.parameters.len())..)
+                            .collect::<Vec<_>>();
+
+                        native_method(params, descriptor);
+                    }
+
+                    // println!("{:#?}",);
+                }
                 OpCodes::bipush(byte) => todo!(),
                 OpCodes::sipush(short) => todo!(),
                 OpCodes::new(cp_index) => todo!(),
